@@ -1,9 +1,12 @@
 """Endpoints antennes ANFR."""
 
+import csv
+import io
 from typing import Annotated, Any
 
 import duckdb
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 
 from observatoire.api.deps import get_db
 from observatoire.db.queries import (
@@ -57,6 +60,34 @@ async def nearby_antennas(
 ) -> list[dict[str, Any]]:
     """Antennes proches d'un point GPS, triées par distance."""
     return get_nearby_antennas(db, lat, lon, radius, technology, limit)
+
+
+@router.get("/export.csv")
+async def export_antennas_csv(
+    db: DB,
+    department: str | None = Query(None, description="Code département"),
+    operator: str | None = Query(None, description="Code opérateur"),
+    technology: str | None = Query(None, description="Technologie"),
+) -> StreamingResponse:
+    """Exporte les antennes en CSV (max 10 000 lignes)."""
+    data = get_antenna_list(db, operator, technology, None, limit=10000, offset=0)
+
+    if department:
+        data = [d for d in data if str(d.get("commune_code", "")).startswith(department)]
+
+    output = io.StringIO()
+    if data:
+        writer = csv.DictWriter(output, fieldnames=data[0].keys())
+        writer.writeheader()
+        writer.writerows(data)
+
+    output.seek(0)
+    filename = f"antennes_{department or 'france'}_{operator or 'all'}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.get("/")

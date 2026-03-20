@@ -93,6 +93,18 @@ async function updateStats() {
 }
 
 /**
+ * Exporte les antennes en CSV selon les filtres actifs.
+ */
+function exportCSV() {
+    const dept = document.getElementById("dept-select").value;
+    const operator = document.getElementById("operator-select").value;
+    const params = new URLSearchParams();
+    if (dept) params.set("department", dept);
+    if (operator && operator !== "all") params.set("operator", operator);
+    window.open(`${API_BASE}/antennas/export.csv?${params.toString()}`, "_blank");
+}
+
+/**
  * Recherche une commune par code INSEE et zoome dessus.
  */
 async function searchCommune() {

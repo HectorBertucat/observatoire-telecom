@@ -36,6 +36,10 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - MCP tool find_nearby_antennas : recherche géospatiale par coordonnées GPS
 - Agent E2E testé avec pydantic-ai TestModel (sans clé API)
 - `python -m observatoire` lance l'API directement
+- Sélecteur de département dynamique (97 départements avec noms et comptages)
+- Stats contextuelles par département (graphique + cards)
+- Export CSV des antennes (/antennas/export.csv) avec filtres département/opérateur
+- Clic droit sur la carte = popup antennes proches (rayon 2km)
 - README complet avec guide de démarrage, API, architecture
 - Licence MIT
 - 5 nouveaux tests API antennes (26 tests total)
