@@ -1,5 +1,7 @@
 """Requêtes SQL métier réutilisables."""
 
+import json
+
 import duckdb
 
 
@@ -69,21 +71,28 @@ def get_coverage_geojson(
     conn: duckdb.DuckDBPyConnection,
     operator_code: str,
     technology: str = "4G",
+    limit: int = 10,
 ) -> dict:
-    """Retourne les géométries de couverture en GeoJSON simplifié."""
+    """Retourne les enveloppes de couverture en GeoJSON.
+
+    Les géométries ARCEP sont trop lourdes (~200k points chacune) pour
+    être servies en GeoJSON. On retourne les enveloppes (bounding boxes)
+    qui sont instantanées à calculer.
+    """
     result = conn.execute(
         """
         SELECT
-            ST_AsGeoJSON(ST_Simplify(geometry, 0.01)) AS geojson,
+            ST_AsGeoJSON(ST_Envelope(geometry)) AS geojson,
             operator_code,
             technology,
-            quarter
+            quarter,
+            ST_NPoints(geometry) AS npoints
         FROM raw_coverage
-        WHERE operator_code = ?
-          AND technology = ?
-        LIMIT 50
+        WHERE operator_code = $1
+          AND technology = $2
+        LIMIT $3
         """,
-        [operator_code, technology],
+        [operator_code, technology, limit],
     ).fetchall()
 
     features = []
@@ -91,11 +100,12 @@ def get_coverage_geojson(
         features.append(
             {
                 "type": "Feature",
-                "geometry": __import__("json").loads(row[0]),
+                "geometry": json.loads(row[0]),
                 "properties": {
                     "operator": row[1],
                     "technology": row[2],
                     "quarter": row[3],
+                    "detail_points": row[4],
                 },
             }
         )

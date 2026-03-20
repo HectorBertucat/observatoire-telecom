@@ -29,6 +29,7 @@ async def coverage_geojson(
     db: DB,
     operator: str = Query("OF", description="Code opérateur (BYT, FREE, OF, SFR)"),
     technology: str = Query("4G", description="Technologie réseau"),
+    limit: int = Query(10, ge=1, le=100, description="Nombre max de géométries"),
 ):
-    """Retourne les polygones de couverture en GeoJSON (simplifiés)."""
-    return get_coverage_geojson(db, operator, technology)
+    """Retourne les enveloppes de couverture en GeoJSON."""
+    return get_coverage_geojson(db, operator, technology, limit=limit)
