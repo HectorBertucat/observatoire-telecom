@@ -1,14 +1,13 @@
 /* Carte MapLibre GL JS avec vector tiles PMTiles */
 
-// Enregistrer le protocole PMTiles
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol("pmtiles", protocol.tile);
 
-const OPERATOR_COLORS = {
-    OF: "#FF6600",
-    SFR: "#E4002B",
-    BYT: "#003DA5",
-    FREE: "#CD1719",
+const OPERATORS = {
+    OF:   { name: "Orange",          color: "#FF6600" },
+    BYT:  { name: "Bouygues Telecom", color: "#003DA5" },
+    FREE: { name: "Free Mobile",     color: "#CD1719" },
+    SFR:  { name: "SFR",            color: "#E4002B" },
 };
 
 const map = new maplibregl.Map({
@@ -35,30 +34,32 @@ const map = new maplibregl.Map({
                 minzoom: 0,
                 maxzoom: 19,
             },
-            // Une couche fill par opérateur pour pouvoir filtrer
-            ...Object.entries(OPERATOR_COLORS).map(([op, color]) => ({
-                id: `coverage-fill-${op}`,
-                type: "fill",
-                source: "coverage",
-                "source-layer": "coverage",
-                filter: ["==", ["get", "operator"], op],
-                paint: {
-                    "fill-color": color,
-                    "fill-opacity": 0.35,
+            // Fill + line par opérateur
+            ...Object.entries(OPERATORS).flatMap(([op, info]) => [
+                {
+                    id: `coverage-fill-${op}`,
+                    type: "fill",
+                    source: "coverage",
+                    "source-layer": "coverage",
+                    filter: ["==", ["get", "operator"], op],
+                    paint: {
+                        "fill-color": info.color,
+                        "fill-opacity": 0.35,
+                    },
                 },
-            })),
-            ...Object.entries(OPERATOR_COLORS).map(([op, color]) => ({
-                id: `coverage-line-${op}`,
-                type: "line",
-                source: "coverage",
-                "source-layer": "coverage",
-                filter: ["==", ["get", "operator"], op],
-                paint: {
-                    "line-color": color,
-                    "line-width": 0.5,
-                    "line-opacity": 0.6,
+                {
+                    id: `coverage-line-${op}`,
+                    type: "line",
+                    source: "coverage",
+                    "source-layer": "coverage",
+                    filter: ["==", ["get", "operator"], op],
+                    paint: {
+                        "line-color": info.color,
+                        "line-width": 0.5,
+                        "line-opacity": 0.6,
+                    },
                 },
-            })),
+            ]),
         ],
     },
     center: [2.888, 46.603],
@@ -66,43 +67,112 @@ const map = new maplibregl.Map({
     maxZoom: 14,
 });
 
+// Navigation controls
+map.addControl(new maplibregl.NavigationControl(), "top-right");
+
 // Popup au clic
 map.on("click", (e) => {
-    // Chercher dans toutes les couches coverage-fill-*
-    const layers = Object.keys(OPERATOR_COLORS).map((op) => `coverage-fill-${op}`);
+    const layers = Object.keys(OPERATORS).map((op) => `coverage-fill-${op}`);
     const features = map.queryRenderedFeatures(e.point, { layers });
-
     if (features.length === 0) return;
 
-    const props = features[0].properties;
-    const opName = {
-        OF: "Orange",
-        SFR: "SFR",
-        BYT: "Bouygues Telecom",
-        FREE: "Free Mobile",
-    };
+    // Lister tous les opérateurs à ce point
+    const ops = [...new Set(features.map((f) => f.properties.operator))];
+    const lines = ops.map((op) => {
+        const info = OPERATORS[op];
+        const dot = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${info.color};margin-right:4px"></span>`;
+        return `${dot}<b>${info.name}</b>`;
+    });
 
-    new maplibregl.Popup()
+    const quarter = features[0].properties.quarter || "";
+    const tech = features[0].properties.technology || "";
+
+    new maplibregl.Popup({ maxWidth: "250px" })
         .setLngLat(e.lngLat)
         .setHTML(
-            `<b>${opName[props.operator] || props.operator}</b><br>` +
-                `${props.technology} — ${props.quarter}`
+            `<div style="font-size:13px">` +
+            `<div style="margin-bottom:4px;color:#666">${tech} — ${quarter}</div>` +
+            lines.join("<br>") +
+            `</div>`
         )
         .addTo(map);
 });
 
-// Curseur pointer au survol
-const allFillLayers = Object.keys(OPERATOR_COLORS).map((op) => `coverage-fill-${op}`);
-map.on("mouseenter", allFillLayers[0], () => (map.getCanvas().style.cursor = "pointer"));
-map.on("mouseleave", allFillLayers[0], () => (map.getCanvas().style.cursor = ""));
+// Curseur pointer
+for (const op of Object.keys(OPERATORS)) {
+    map.on("mouseenter", `coverage-fill-${op}`, () => {
+        map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", `coverage-fill-${op}`, () => {
+        map.getCanvas().style.cursor = "";
+    });
+}
 
 /**
  * Filtre les couches par opérateur.
  */
 function filterByOperator(operator) {
-    for (const op of Object.keys(OPERATOR_COLORS)) {
+    for (const op of Object.keys(OPERATORS)) {
         const visible = operator === "all" || operator === op;
-        map.setLayoutProperty(`coverage-fill-${op}`, "visibility", visible ? "visible" : "none");
-        map.setLayoutProperty(`coverage-line-${op}`, "visibility", visible ? "visible" : "none");
+        const vis = visible ? "visible" : "none";
+        map.setLayoutProperty(`coverage-fill-${op}`, "visibility", vis);
+        map.setLayoutProperty(`coverage-line-${op}`, "visibility", vis);
+    }
+    updateLegend(operator);
+}
+
+/**
+ * Construit la légende de la carte.
+ */
+function buildLegend() {
+    const container = document.getElementById("map-legend");
+    if (!container) return;
+
+    for (const [op, info] of Object.entries(OPERATORS)) {
+        const item = document.createElement("label");
+        item.className = "legend-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = true;
+        checkbox.dataset.operator = op;
+        checkbox.addEventListener("change", () => toggleOperator(op, checkbox.checked));
+
+        const swatch = document.createElement("span");
+        swatch.className = "legend-swatch";
+        swatch.style.backgroundColor = info.color;
+
+        const label = document.createElement("span");
+        label.className = "legend-label";
+        label.textContent = info.name;
+
+        item.appendChild(checkbox);
+        item.appendChild(swatch);
+        item.appendChild(label);
+        container.appendChild(item);
     }
 }
+
+/**
+ * Toggle la visibilité d'un opérateur via la légende.
+ */
+function toggleOperator(op, visible) {
+    const vis = visible ? "visible" : "none";
+    map.setLayoutProperty(`coverage-fill-${op}`, "visibility", vis);
+    map.setLayoutProperty(`coverage-line-${op}`, "visibility", vis);
+}
+
+/**
+ * Synchronise la légende avec le filtre du select.
+ */
+function updateLegend(operator) {
+    const checkboxes = document.querySelectorAll("#map-legend input[type=checkbox]");
+    checkboxes.forEach((cb) => {
+        cb.checked = operator === "all" || cb.dataset.operator === operator;
+    });
+}
+
+// Construire la légende une fois la carte chargée
+map.on("load", () => {
+    buildLegend();
+});

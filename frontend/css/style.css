@@ -137,6 +137,47 @@ main {
 #map {
     height: 500px;
     border-radius: var(--radius);
+    position: relative;
+}
+
+.map-legend {
+    position: absolute;
+    bottom: 30px;
+    left: 10px;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    box-shadow: var(--shadow);
+    font-size: 0.82rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.legend-item input[type="checkbox"] {
+    margin: 0;
+    accent-color: var(--color-accent);
+}
+
+.legend-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.legend-label {
+    color: var(--color-text);
 }
 
 .charts-container {

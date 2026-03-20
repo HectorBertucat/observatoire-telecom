@@ -18,8 +18,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Tolérance en mètres (Lambert-93) — 500m pour garder du détail
-SIMPLIFY_TOLERANCE = 500
+# Tolérance en mètres (Lambert-93) — 250m pour un bon détail au zoom
+SIMPLIFY_TOLERANCE = 250
 
 OPERATORS = {
     "OF": "Orange",
