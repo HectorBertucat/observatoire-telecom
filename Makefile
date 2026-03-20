@@ -1,8 +1,12 @@
-.PHONY: help ingest serve test lint format mcp seed tiles clean
+.PHONY: help pipeline ingest serve test lint format mcp seed tiles clean
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
+
+pipeline: ## Pipeline complète : download ARCEP + load + generate tiles
+	uv run python scripts/run_full_pipeline.py orange bouygues free sfr
+	uv run python scripts/generate_tiles.py
 
 ingest: ## Lance le pipeline d'ingestion complet
 	uv run python -m observatoire.ingestion.loader

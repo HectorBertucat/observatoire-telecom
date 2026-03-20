@@ -5,7 +5,7 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
-## [Unreleased]
+## [0.1.0] - 2026-03-21
 
 ### Added
 - Pipeline d'ingestion ARCEP : download async (httpx) → extract 7z → load GeoPackage

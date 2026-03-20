@@ -64,10 +64,13 @@ make serve
 ### Commandes utiles
 
 ```bash
-make test     # Lancer les tests (pytest)
-make lint     # Verifier le code (ruff)
+make test     # Lancer les tests (pytest, 34 tests)
+make lint     # Verifier le code (ruff + mypy)
 make format   # Formater le code
 make mcp      # Lancer le serveur MCP
+make pipeline # Pipeline complete (download + load + tiles)
+make seed     # Generer des donnees de test (sans telechargement)
+make tiles    # Regenerer les vector tiles PMTiles
 ```
 
 ## API
@@ -79,8 +82,15 @@ Documentation interactive disponible sur `/docs` (Swagger UI).
 | `GET /health` | Health check |
 | `GET /api/v1/coverage/geojson` | Polygones de couverture (GeoJSON) |
 | `GET /api/v1/coverage/commune/{code}` | Couverture par commune |
-| `GET /api/v1/antennas/` | Liste des sites d'antennes (pagine) |
-| `GET /api/v1/antennas/stats` | Stats antennes par operateur/techno |
+| `GET /api/v1/antennas/` | Sites d'antennes (pagine, filtrable) |
+| `GET /api/v1/antennas/stats` | Stats par operateur/techno |
+| `GET /api/v1/antennas/department/{code}` | Stats par departement |
+| `GET /api/v1/antennas/commune/{code}` | Resume antennes d'une commune |
+| `GET /api/v1/antennas/nearby` | Antennes proches (lat/lon/radius) |
+| `GET /api/v1/antennas/export.csv` | Export CSV avec filtres |
+| `GET /api/v1/stats/departments` | Liste des departements |
+| `GET /api/v1/stats/coverage` | Stats couverture ARCEP |
+| `GET /api/v1/stats/antennas` | Stats antennes nationales |
 | `GET /api/v1/stats/tables` | Comptage par table |
 
 ## Sources de donnees

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "observatoire-telecom": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "observatoire.mcp"]
+    }
+  }
+}
