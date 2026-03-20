@@ -33,6 +33,12 @@
         <button onclick="applyFilter()">Afficher</button>
         <button onclick="resetView()" class="btn-secondary">France</button>
         <div class="control-group">
+            <label for="dept-select">Département</label>
+            <select id="dept-select" onchange="selectDepartment()">
+                <option value="">-- National --</option>
+            </select>
+        </div>
+        <div class="control-group">
             <label for="commune-input">Commune (INSEE)</label>
             <div style="display:flex;gap:4px">
                 <input type="text" id="commune-input" placeholder="ex: 31555"

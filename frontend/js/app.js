@@ -135,7 +135,68 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+/**
+ * Charge la liste des départements dans le sélecteur.
+ */
+async function loadDepartments() {
+    try {
+        const response = await fetch(`${API_BASE}/stats/departments`);
+        const departments = await response.json();
+        const select = document.getElementById("dept-select");
+
+        departments.forEach((dept) => {
+            const option = document.createElement("option");
+            option.value = dept.code;
+            option.textContent = `${dept.code} - ${dept.name} (${dept.antenna_count.toLocaleString("fr-FR")})`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Erreur chargement départements:", error);
+    }
+}
+
+/**
+ * Sélectionne un département : zoom + stats locales.
+ */
+async function selectDepartment() {
+    const code = document.getElementById("dept-select").value;
+
+    if (!code) {
+        // Retour au national
+        map.flyTo({ center: [2.888, 46.603], zoom: 5.5, duration: 1 });
+        updateStats();
+        return;
+    }
+
+    // Charger les stats du département
+    try {
+        const response = await fetch(`${API_BASE}/antennas/department/${code}`);
+        const data = await response.json();
+
+        if (data.length > 0) {
+            updateAntennasChart(data);
+
+            // Mettre à jour les stats cards
+            const grid = document.getElementById("stats-grid");
+            while (grid.firstChild) grid.removeChild(grid.firstChild);
+
+            const total = data.reduce((s, d) => s + d.site_count, 0);
+            const t4g = data.filter((d) => d.technology === "4G").reduce((s, d) => s + d.site_count, 0);
+            const t5g = data.filter((d) => d.technology === "5G").reduce((s, d) => s + d.site_count, 0);
+            const ops = new Set(data.map((d) => d.operator)).size;
+
+            grid.appendChild(createStatCard("Sites dept " + code, total, "Toutes technologies"));
+            grid.appendChild(createStatCard("Sites 4G", t4g, "LTE"));
+            grid.appendChild(createStatCard("Sites 5G", t5g, "NR"));
+            grid.appendChild(createStatCard("Opérateurs", ops, "Dans ce département"));
+        }
+    } catch (error) {
+        console.error("Erreur stats département:", error);
+    }
+}
+
 // Chargement initial
 document.addEventListener("DOMContentLoaded", () => {
+    loadDepartments();
     updateStats();
 });
