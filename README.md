@@ -88,6 +88,35 @@ Documentation interactive disponible sur `/docs` (Swagger UI).
 | [ARCEP - Mon Reseau Mobile](https://data.arcep.fr/mobile/) | Couverture theorique 4G (GeoPackage) | Licence Ouverte |
 | [ANFR - Installations radioelectriques](https://www.data.gouv.fr/fr/datasets/551d4ff3c751df55da0cd89f/) | Sites d'antennes (CSV) | Licence Ouverte |
 
+## Serveur MCP (Claude Desktop / Claude Code)
+
+Le serveur MCP permet d'interroger les donnees telecom en langage naturel via Claude.
+
+**Configurer dans Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`) :
+
+```json
+{
+  "mcpServers": {
+    "observatoire-telecom": {
+      "command": "uv",
+      "args": [
+        "--directory", "/chemin/vers/observatoire-telecom",
+        "run", "python", "-m", "observatoire.mcp"
+      ]
+    }
+  }
+}
+```
+
+**Tools disponibles :**
+
+| Tool | Description |
+|------|-------------|
+| `get_antenna_count` | Antennes par operateur pour une commune ou national |
+| `compare_operators` | Classement operateurs par nombre de sites |
+| `get_coverage_summary` | Resume des donnees disponibles |
+| `search_antennas` | Recherche d'antennes dans une commune avec GPS |
+
 ## Architecture
 
 ```
