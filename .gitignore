@@ -6,10 +6,13 @@ build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
 
-# Données locales (trop volumineux pour git)
+# Données locales (générées, trop volumineux pour git)
 data/raw/
 data/processed/
+data/geojson/
+data/tiles/
 data/*.duckdb
 data/*.duckdb.wal
 

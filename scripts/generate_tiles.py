@@ -100,15 +100,15 @@ def generate_pmtiles(geojson_path: Path) -> Path:
         [
             "tippecanoe",
             "-o", str(dest),
-            "--force",                    # Écraser si existant
+            "--force",                        # Écraser si existant
             "--name", "Observatoire Télécom",
-            "--layer", "coverage",        # Nom de la couche
-            "--minimum-zoom", "4",        # Zoom min (France entière)
-            "--maximum-zoom", "12",       # Zoom max (quartier)
-            "--simplification", "10",     # Simplification supplémentaire
-            "--detect-shared-borders",    # Évite les artefacts aux bordures
-            "--coalesce-densest-as-needed",  # Fusionne si trop dense
-            "--extend-zooms-if-still-dropping",  # Garde le détail si nécessaire
+            "--layer", "coverage",            # Nom de la couche
+            "--minimum-zoom", "4",            # Zoom min (France entière)
+            "--maximum-zoom", "12",           # Zoom max (quartier)
+            "--no-feature-limit",             # Ne jamais dropper de features
+            "--no-tile-size-limit",           # Pas de limite de taille par tuile
+            "--simplification", "10",         # Simplification géométrique par zoom
+            "--detect-shared-borders",        # Évite les artefacts aux bordures
             str(geojson_path),
         ],
         capture_output=True,
