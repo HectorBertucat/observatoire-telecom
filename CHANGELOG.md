@@ -29,7 +29,8 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - Popup au clic sur antenne : opérateur, technologie, commune
 - Dashboard stats enrichies : total sites, 4G, 5G, opérateurs
 - Graphique stacked bars : sites d'antennes par opérateur × technologie
-- API antennes : endpoints /antennas/ et /antennas/stats avec pagination/filtres
+- API antennes : endpoints /antennas/, /antennas/stats, /antennas/commune/{code}
+- Recherche par commune (code INSEE) : zoom + affichage antennes locales
 - README complet avec guide de démarrage, API, architecture
 - Licence MIT
 - 5 nouveaux tests API antennes (26 tests total)
@@ -37,6 +38,8 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
   - get_antenna_count, compare_operators, get_coverage_summary, search_antennas
 
 ### Fixed
+- Codes commune ANFR : utilise COM_CD_INSEE (code INSEE) au lieu de DEM_NM_COMSIS
+- department_code dérivé du code INSEE (2 premiers chiffres)
 - Reprojection Lambert-93 (EPSG:2154) → WGS84 (EPSG:4326) avec ST_FlipCoordinates
 - Simplification géométrique : tolérance en mètres (5000m) au lieu de degrés
 - Tippecanoe : --no-feature-limit pour éviter les zones vides au dézoom

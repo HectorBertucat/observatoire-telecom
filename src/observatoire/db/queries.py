@@ -150,6 +150,42 @@ def get_coverage_geojson(operator_code: str, technology: str = "4G") -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def search_commune_antennas(
+    conn: duckdb.DuckDBPyConnection,
+    commune_code: str,
+) -> dict:
+    """Retourne un résumé des antennes pour une commune."""
+    result = conn.execute(
+        """
+        SELECT
+            operator, technology, COUNT(*) as cnt,
+            ROUND(AVG(latitude), 5) as avg_lat,
+            ROUND(AVG(longitude), 5) as avg_lon
+        FROM raw_antenna_sites
+        WHERE commune_code = ?
+        GROUP BY operator, technology
+        ORDER BY operator, technology
+        """,
+        [commune_code],
+    ).fetchall()
+
+    if not result:
+        return {"commune_code": commune_code, "total": 0, "operators": []}
+
+    columns = ["operator", "technology", "count", "avg_lat", "avg_lon"]
+    operators = [dict(zip(columns, row, strict=True)) for row in result]
+    total = sum(r[2] for r in result)
+    center_lat = sum(r[3] for r in result) / len(result)
+    center_lon = sum(r[4] for r in result) / len(result)
+
+    return {
+        "commune_code": commune_code,
+        "total": total,
+        "center": {"lat": center_lat, "lon": center_lon},
+        "operators": operators,
+    }
+
+
 def get_table_counts(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
     """Retourne le nombre de lignes par table."""
     tables = [row[0] for row in conn.execute("SHOW TABLES").fetchall()]

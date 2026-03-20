@@ -92,6 +92,49 @@ async function updateStats() {
     }
 }
 
+/**
+ * Recherche une commune par code INSEE et zoome dessus.
+ */
+async function searchCommune() {
+    const code = document.getElementById("commune-input").value.trim();
+    if (!code || code.length < 4) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/antennas/commune/${code}`);
+        const data = await response.json();
+
+        if (data.total === 0) {
+            alert(`Aucune antenne trouvée pour la commune ${code}.`);
+            return;
+        }
+
+        // Zoomer sur la commune
+        map.flyTo({
+            center: [data.center.lon, data.center.lat],
+            zoom: 13,
+            duration: 1.5,
+        });
+
+        // Afficher un résumé dans la console et via popup
+        const summary = data.operators
+            .map((o) => `${o.operator} ${o.technology}: ${o.count}`)
+            .join(", ");
+        console.log(`Commune ${code}: ${data.total} antennes — ${summary}`);
+    } catch (error) {
+        console.error("Erreur recherche commune:", error);
+    }
+}
+
+// Enter key sur l'input commune
+document.addEventListener("DOMContentLoaded", () => {
+    const input = document.getElementById("commune-input");
+    if (input) {
+        input.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") searchCommune();
+        });
+    }
+});
+
 // Chargement initial
 document.addEventListener("DOMContentLoaded", () => {
     updateStats();

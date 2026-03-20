@@ -6,7 +6,7 @@ import duckdb
 from fastapi import APIRouter, Depends, Query
 
 from observatoire.api.deps import get_db
-from observatoire.db.queries import get_antenna_list, get_antenna_stats
+from observatoire.db.queries import get_antenna_list, get_antenna_stats, search_commune_antennas
 
 router = APIRouter()
 
@@ -20,6 +20,15 @@ async def antenna_stats(
 ):
     """Retourne le nombre de sites par opérateur et technologie."""
     return get_antenna_stats(db, operator)
+
+
+@router.get("/commune/{commune_code}")
+async def commune_antennas(
+    commune_code: str,
+    db: DB,
+):
+    """Résumé des antennes pour une commune (code INSEE)."""
+    return search_commune_antennas(db, commune_code)
 
 
 @router.get("/")

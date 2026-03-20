@@ -32,6 +32,14 @@
         </div>
         <button onclick="applyFilter()">Afficher</button>
         <button onclick="resetView()" class="btn-secondary">France</button>
+        <div class="control-group">
+            <label for="commune-input">Commune (INSEE)</label>
+            <div style="display:flex;gap:4px">
+                <input type="text" id="commune-input" placeholder="ex: 31555"
+                    maxlength="5" style="width:90px;padding:0.5rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.9rem">
+                <button onclick="searchCommune()" class="btn-secondary">Go</button>
+            </div>
+        </div>
     </nav>
 
     <main>
