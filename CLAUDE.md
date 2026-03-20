@@ -1,15 +1,19 @@
 # Observatoire Télécom France
 
 ## Contexte
-Ce projet est un observatoire open-source de la couverture et de la qualité
-des réseaux mobiles en France, basé sur les données ouvertes ARCEP/ANFR.
+Observatoire open-source de la couverture et de la qualité des réseaux mobiles
+en France, basé sur les données ouvertes ARCEP/ANFR. Side-project data engineering
++ préparation certification Claude Certified Architect (CCA-F).
 
 ## Stack technique
 - Python 3.12+ avec uv (gestionnaire de paquets)
-- DuckDB avec extension spatial (base analytique)
+- DuckDB avec extension spatial (base analytique, données en Lambert-93 / EPSG:2154)
 - FastAPI (API REST)
-- MCP SDK Python (serveur Model Context Protocol)
+- MCP SDK Python — FastMCP (serveur Model Context Protocol)
 - pydantic-ai + anthropic SDK (agents IA)
+- MapLibre GL JS + PMTiles (carte vector tiles, remplace Leaflet)
+- Tippecanoe (génération des vector tiles)
+- Chart.js (graphiques)
 
 ## Conventions
 - Code en anglais (noms de variables, fonctions, classes)
@@ -20,25 +24,60 @@ des réseaux mobiles en France, basé sur les données ouvertes ARCEP/ANFR.
 - Convention de nommage tables : raw_*, stg_*, mart_*, ref_*
 - Tests avec pytest, fixtures dans conftest.py
 - Linting : ruff (déjà configuré dans pyproject.toml)
+- Commits : conventional commits (feat:, fix:, perf:, docs:, etc.)
 
 ## Structure
 - src/observatoire/ : code source principal
-- src/observatoire/ingestion/ : pipeline d'ingestion des données
-- src/observatoire/db/ : couche données DuckDB
-- src/observatoire/api/ : API REST FastAPI
-- src/observatoire/mcp/ : serveur MCP
-- src/observatoire/agent/ : agent d'analyse Claude
-- tests/ : tests unitaires et d'intégration
-- data/ : données locales (raw, processed, samples)
+- src/observatoire/ingestion/ : pipeline d'ingestion (downloader, extractor, loader)
+- src/observatoire/db/ : couche données DuckDB (connection, schema, queries, simplify)
+- src/observatoire/api/ : API REST FastAPI (routers, schemas, deps)
+- src/observatoire/mcp/ : serveur MCP (tools, resources, prompts)
+- src/observatoire/agent/ : agent d'analyse Claude (coordinator, sub_agents)
+- frontend/ : dashboard web (HTML/JS/CSS, MapLibre, Chart.js)
+- scripts/ : pipeline (run_full_pipeline.py, generate_tiles.py)
+- tests/ : tests unitaires et d'intégration (21 tests)
+- data/ : données locales (gitignored sauf samples/)
+- docs/ : documentation projet (ADR, data dictionary)
 
 ## Commandes courantes
-- `make ingest` : lancer le pipeline d'ingestion
-- `make serve` : lancer l'API en dev (uvicorn --reload)
-- `make test` : lancer les tests
-- `make lint` : vérifier le code avec ruff
+- `make serve` : lancer l'API en dev (uvicorn --reload) → http://localhost:8000
+- `make test` : lancer les tests (pytest)
+- `make lint` : vérifier le code (ruff check + format)
+- `make format` : formater le code automatiquement
 - `make mcp` : lancer le serveur MCP
+- `uv run python scripts/run_full_pipeline.py [operators...]` : pipeline d'ingestion
+- `uv run python scripts/generate_tiles.py` : régénérer les vector tiles PMTiles
+
+## Pipeline de données
+1. Download : httpx async depuis data.arcep.fr → data/raw/
+2. Extract : 7z → data/processed/ (.gpkg GeoPackage)
+3. Load : ST_Read() DuckDB → table raw_coverage (EPSG:2154)
+4. Simplify : ST_Simplify(geom, 500m) + ST_Transform → GeoJSON (EPSG:4326)
+5. Tiles : Tippecanoe → PMTiles (z4-z12) → data/tiles/
+
+## Données chargées (état actuel)
+- 4 opérateurs : Orange (OF), Bouygues (BYT), Free (FREE), SFR (SFR)
+- Technologie : 4G uniquement pour l'instant
+- Trimestre : 2025_T3 (données ARCEP publiées déc. 2025)
+- 1148 géométries MULTIPOLYGON dans raw_coverage
+- Codes fichiers ARCEP : BOUY, FREE, OF, SFR0 (≠ codes DB : BYT, FREE, OF, SFR)
 
 ## Règles de sécurité
 - Ne jamais commiter de clés API dans le code
 - DuckDB est ouvert en read-only pour l'API
-- Les données brutes ne sont jamais servies directement
+- Les données brutes ne sont jamais servies directement (trop lourdes, ~200k pts/geom)
+- Pas de innerHTML dans le frontend (DOM API uniquement)
+
+## Documentation du projet
+Le projet maintient une documentation vivante qui DOIT être mise à jour :
+- **CHANGELOG.md** : mis à jour à chaque feature/fix (format Keep a Changelog)
+- **docs/adr/** : un ADR par décision architecturale majeure
+- **docs/data-dictionary.md** : schéma des tables DuckDB
+
+**IMPORTANT — Règle de maintenance documentaire :**
+Après chaque modification significative (nouvelle feature, fix important, changement
+d'architecture), mettre à jour :
+1. CHANGELOG.md → ajouter l'entrée dans [Unreleased]
+2. docs/adr/ → créer un ADR si c'est une décision architecturale
+3. docs/data-dictionary.md → si le schéma DB change
+4. Ce fichier (CLAUDE.md) → si la stack, structure, ou état du projet change
