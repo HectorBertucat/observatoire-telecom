@@ -25,6 +25,10 @@ const map = new maplibregl.Map({
                 type: "vector",
                 url: "pmtiles:///tiles/coverage.pmtiles",
             },
+            antennas: {
+                type: "vector",
+                url: "pmtiles:///tiles/antennas.pmtiles",
+            },
         },
         layers: [
             {
@@ -34,7 +38,7 @@ const map = new maplibregl.Map({
                 minzoom: 0,
                 maxzoom: 19,
             },
-            // Fill + line par opérateur
+            // Couverture : fill + line par opérateur
             ...Object.entries(OPERATORS).flatMap(([op, info]) => [
                 {
                     id: `coverage-fill-${op}`,
@@ -60,32 +64,78 @@ const map = new maplibregl.Map({
                     },
                 },
             ]),
+            // Antennes : cercles par opérateur (visibles à partir de z8)
+            ...Object.entries(OPERATORS).map(([op, info]) => ({
+                id: `antennas-${op}`,
+                type: "circle",
+                source: "antennas",
+                "source-layer": "antennas",
+                filter: ["==", ["get", "operator"], op],
+                minzoom: 8,
+                paint: {
+                    "circle-radius": [
+                        "interpolate", ["linear"], ["zoom"],
+                        8, 2,
+                        10, 3,
+                        12, 5,
+                        14, 7,
+                    ],
+                    "circle-color": info.color,
+                    "circle-stroke-color": "#fff",
+                    "circle-stroke-width": [
+                        "interpolate", ["linear"], ["zoom"],
+                        8, 0,
+                        10, 0.5,
+                        12, 1,
+                    ],
+                    "circle-opacity": 0.8,
+                },
+            })),
         ],
     },
     center: [2.888, 46.603],
     zoom: 5.5,
-    maxZoom: 14,
+    maxZoom: 15,
 });
 
 // Navigation controls
 map.addControl(new maplibregl.NavigationControl(), "top-right");
 
-// Popup au clic
+// Popup au clic — couverture
 map.on("click", (e) => {
-    const layers = Object.keys(OPERATORS).map((op) => `coverage-fill-${op}`);
-    const features = map.queryRenderedFeatures(e.point, { layers });
-    if (features.length === 0) return;
+    // Chercher antennes d'abord (plus précis)
+    const antennaLayers = Object.keys(OPERATORS).map((op) => `antennas-${op}`);
+    const antennaFeats = map.queryRenderedFeatures(e.point, { layers: antennaLayers });
 
-    // Lister tous les opérateurs à ce point
-    const ops = [...new Set(features.map((f) => f.properties.operator))];
+    if (antennaFeats.length > 0) {
+        const props = antennaFeats[0].properties;
+        const info = OPERATORS[props.operator] || { name: props.operator, color: "#999" };
+        new maplibregl.Popup({ maxWidth: "250px" })
+            .setLngLat(e.lngLat)
+            .setHTML(
+                `<div style="font-size:13px">` +
+                `<b>${info.name}</b> — Antenne ${props.technology}<br>` +
+                `<span style="color:#666">Commune: ${props.commune || "?"}</span>` +
+                `</div>`
+            )
+            .addTo(map);
+        return;
+    }
+
+    // Sinon couverture
+    const coverageLayers = Object.keys(OPERATORS).map((op) => `coverage-fill-${op}`);
+    const coverageFeats = map.queryRenderedFeatures(e.point, { layers: coverageLayers });
+    if (coverageFeats.length === 0) return;
+
+    const ops = [...new Set(coverageFeats.map((f) => f.properties.operator))];
     const lines = ops.map((op) => {
         const info = OPERATORS[op];
         const dot = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${info.color};margin-right:4px"></span>`;
         return `${dot}<b>${info.name}</b>`;
     });
 
-    const quarter = features[0].properties.quarter || "";
-    const tech = features[0].properties.technology || "";
+    const quarter = coverageFeats[0].properties.quarter || "";
+    const tech = coverageFeats[0].properties.technology || "";
 
     new maplibregl.Popup({ maxWidth: "250px" })
         .setLngLat(e.lngLat)
@@ -100,12 +150,14 @@ map.on("click", (e) => {
 
 // Curseur pointer
 for (const op of Object.keys(OPERATORS)) {
-    map.on("mouseenter", `coverage-fill-${op}`, () => {
-        map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", `coverage-fill-${op}`, () => {
-        map.getCanvas().style.cursor = "";
-    });
+    for (const layerPrefix of ["coverage-fill-", "antennas-"]) {
+        map.on("mouseenter", `${layerPrefix}${op}`, () => {
+            map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", `${layerPrefix}${op}`, () => {
+            map.getCanvas().style.cursor = "";
+        });
+    }
 }
 
 /**
@@ -117,6 +169,7 @@ function filterByOperator(operator) {
         const vis = visible ? "visible" : "none";
         map.setLayoutProperty(`coverage-fill-${op}`, "visibility", vis);
         map.setLayoutProperty(`coverage-line-${op}`, "visibility", vis);
+        map.setLayoutProperty(`antennas-${op}`, "visibility", vis);
     }
     updateLegend(operator);
 }
@@ -151,6 +204,40 @@ function buildLegend() {
         item.appendChild(label);
         container.appendChild(item);
     }
+
+    // Toggle antennes
+    const sep = document.createElement("hr");
+    sep.style.margin = "4px 0";
+    sep.style.border = "none";
+    sep.style.borderTop = "1px solid #e2e8f0";
+    container.appendChild(sep);
+
+    const antennaItem = document.createElement("label");
+    antennaItem.className = "legend-item";
+
+    const antennaCb = document.createElement("input");
+    antennaCb.type = "checkbox";
+    antennaCb.checked = true;
+    antennaCb.addEventListener("change", () => {
+        const vis = antennaCb.checked ? "visible" : "none";
+        for (const op of Object.keys(OPERATORS)) {
+            map.setLayoutProperty(`antennas-${op}`, "visibility", vis);
+        }
+    });
+
+    const antennaSwatch = document.createElement("span");
+    antennaSwatch.className = "legend-swatch";
+    antennaSwatch.style.background = "radial-gradient(circle, #666 40%, transparent 40%)";
+    antennaSwatch.style.border = "1px solid #999";
+
+    const antennaLabel = document.createElement("span");
+    antennaLabel.className = "legend-label";
+    antennaLabel.textContent = "Antennes (z8+)";
+
+    antennaItem.appendChild(antennaCb);
+    antennaItem.appendChild(antennaSwatch);
+    antennaItem.appendChild(antennaLabel);
+    container.appendChild(antennaItem);
 }
 
 /**
@@ -160,6 +247,7 @@ function toggleOperator(op, visible) {
     const vis = visible ? "visible" : "none";
     map.setLayoutProperty(`coverage-fill-${op}`, "visibility", vis);
     map.setLayoutProperty(`coverage-line-${op}`, "visibility", vis);
+    map.setLayoutProperty(`antennas-${op}`, "visibility", vis);
 }
 
 /**
@@ -168,7 +256,9 @@ function toggleOperator(op, visible) {
 function updateLegend(operator) {
     const checkboxes = document.querySelectorAll("#map-legend input[type=checkbox]");
     checkboxes.forEach((cb) => {
-        cb.checked = operator === "all" || cb.dataset.operator === operator;
+        if (cb.dataset.operator) {
+            cb.checked = operator === "all" || cb.dataset.operator === operator;
+        }
     });
 }
 
