@@ -9,9 +9,7 @@ import os
 import pytest
 
 # Skip si pas de DB de production
-PROD_DB = os.path.expanduser(
-    "~/Code/observatoire-telecom/data/observatoire.duckdb"
-)
+PROD_DB = os.path.expanduser("~/Code/observatoire-telecom/data/observatoire.duckdb")
 HAS_PROD_DB = os.path.exists(PROD_DB)
 
 

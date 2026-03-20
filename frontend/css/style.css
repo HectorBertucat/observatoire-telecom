@@ -204,7 +204,7 @@ main {
 }
 
 .chart-box canvas {
-    max-height: 180px;
+    max-height: 220px;
 }
 
 .stats-grid {
@@ -255,5 +255,18 @@ footer {
 
     .controls {
         flex-direction: column;
+        align-items: stretch;
+    }
+
+    #map {
+        height: 350px;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+
+    .stat-card .value {
+        font-size: 1.2rem;
     }
 }

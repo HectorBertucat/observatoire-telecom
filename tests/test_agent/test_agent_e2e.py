@@ -47,9 +47,7 @@ async def test_reporter_agent_runs(_patch_agents):
 
 async def test_coordinator_produces_structured_report(_patch_agents):
     """Vérifie que le coordinateur produit un AnalysisReport structuré."""
-    result = await coordinator.run(
-        "Analyse la couverture 4G dans le département 31"
-    )
+    result = await coordinator.run("Analyse la couverture 4G dans le département 31")
     report = result.output
     assert isinstance(report, AnalysisReport)
     assert report.zone is not None

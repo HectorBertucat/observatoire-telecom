@@ -152,6 +152,27 @@ def get_coverage_geojson(operator_code: str, technology: str = "4G") -> dict[str
     return result
 
 
+def get_department_antenna_stats(
+    conn: duckdb.DuckDBPyConnection,
+    department_code: str,
+) -> list[dict[str, Any]]:
+    """Retourne les stats d'antennes pour un département."""
+    result = conn.execute(
+        """
+        SELECT
+            operator, technology, COUNT(*) as site_count
+        FROM raw_antenna_sites
+        WHERE department_code = ?
+        GROUP BY operator, technology
+        ORDER BY operator, technology
+        """,
+        [department_code],
+    ).fetchall()
+
+    columns = ["operator", "technology", "site_count"]
+    return [dict(zip(columns, row, strict=True)) for row in result]
+
+
 def search_commune_antennas(
     conn: duckdb.DuckDBPyConnection,
     commune_code: str,
