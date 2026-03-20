@@ -1,6 +1,7 @@
 """Point d'entrée de l'API FastAPI."""
 
 import logging
+import mimetypes
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -12,6 +13,9 @@ from observatoire.api.routers import antennas, coverage, stats
 from observatoire.api.schemas.common import HealthResponse
 from observatoire.db.connection import get_connection
 from observatoire.db.schema import create_schema, seed_reference_data
+
+# PMTiles MIME type (avant le montage StaticFiles)
+mimetypes.add_type("application/x-protobuf", ".pmtiles")
 
 logger = logging.getLogger(__name__)
 

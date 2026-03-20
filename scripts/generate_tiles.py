@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-SIMPLIFY_TOLERANCE = 250  # mètres (Lambert-93)
+SIMPLIFY_TOLERANCE = 1000  # mètres (Lambert-93) — bon compromis taille/détail
 
 OPERATORS = {
     "OF": "Orange",
