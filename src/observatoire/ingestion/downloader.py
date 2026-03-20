@@ -44,17 +44,17 @@ async def download_file(url: str, dest: Path) -> Path:
         httpx.AsyncClient(follow_redirects=True, timeout=300) as client,
         client.stream("GET", url) as response,
     ):
-            response.raise_for_status()
-            total = int(response.headers.get("content-length", 0))
-            downloaded = 0
+        response.raise_for_status()
+        total = int(response.headers.get("content-length", 0))
+        downloaded = 0
 
-            with open(dest, "wb") as f:
-                async for chunk in response.aiter_bytes(chunk_size=8192):
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total:
-                        pct = (downloaded / total) * 100
-                        logger.debug(f"  {pct:.1f}% ({downloaded}/{total})")
+        with open(dest, "wb") as f:
+            async for chunk in response.aiter_bytes(chunk_size=8192):
+                f.write(chunk)
+                downloaded += len(chunk)
+                if total:
+                    pct = (downloaded / total) * 100
+                    logger.debug(f"  {pct:.1f}% ({downloaded}/{total})")
 
     logger.info(f"Téléchargé : {dest.name} ({dest.stat().st_size:,} bytes)")
     return dest

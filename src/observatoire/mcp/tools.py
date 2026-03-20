@@ -70,8 +70,7 @@ def register_tools(mcp: FastMCP) -> None:
         lines = [f"Comparaison {technology} — Département {department_code}:\n"]
         for row in result:
             lines.append(
-                f"  {row[0]}: {row[1]}% couverture moyenne, "
-                f"{row[2]} antennes, {row[3]} communes"
+                f"  {row[0]}: {row[1]}% couverture moyenne, {row[2]} antennes, {row[3]} communes"
             )
 
         return "\n".join(lines)

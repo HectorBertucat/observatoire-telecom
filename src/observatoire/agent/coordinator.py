@@ -55,8 +55,7 @@ async def run_analysis(request: AnalysisRequest) -> AnalysisReport:
 
     # Étape 2 : Analyser les données
     analysis_result = await analyzer_agent.run(
-        f"Analyse ces données de couverture et identifie les insights :\n"
-        f"{fetch_result.output}"
+        f"Analyse ces données de couverture et identifie les insights :\n{fetch_result.output}"
     )
 
     # Étape 3 : Générer le rapport

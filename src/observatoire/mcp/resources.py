@@ -12,9 +12,7 @@ def register_resources(mcp: FastMCP) -> None:
     def list_operators() -> str:
         """Liste des opérateurs mobiles français avec leurs codes."""
         with db_session(read_only=True) as conn:
-            result = conn.execute(
-                "SELECT code, name FROM ref_operators ORDER BY name"
-            ).fetchall()
+            result = conn.execute("SELECT code, name FROM ref_operators ORDER BY name").fetchall()
 
         if not result:
             return "Aucun opérateur en base."
@@ -47,9 +45,7 @@ def register_resources(mcp: FastMCP) -> None:
             tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
             counts = {}
             for table in tables:
-                count = conn.execute(
-                    f"SELECT count(*) FROM {table}"
-                ).fetchone()[0]  # type: ignore[index]
+                count = conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]  # type: ignore[index]
                 counts[table] = count
 
         lines = ["État de la base Observatoire Télécom:\n"]
