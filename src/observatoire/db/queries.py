@@ -82,7 +82,11 @@ def get_coverage_geojson(
     result = conn.execute(
         """
         SELECT
-            ST_AsGeoJSON(ST_Envelope(geometry)) AS geojson,
+            ST_AsGeoJSON(
+                ST_FlipCoordinates(
+                    ST_Transform(ST_Envelope(geometry), 'EPSG:2154', 'EPSG:4326')
+                )
+            ) AS geojson,
             operator_code,
             technology,
             quarter,
