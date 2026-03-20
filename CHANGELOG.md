@@ -21,6 +21,9 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - Docker + docker-compose : API + Cloudflare Tunnel
 - CI/CD : GitHub Actions (lint, test, typecheck)
 - Documentation : CLAUDE.md, ADR, data dictionary, changelog
+- Légende interactive sur la carte avec checkboxes par opérateur
+- Données ANFR : 354k sites d'antennes (2G/3G/4G/5G, 4 opérateurs)
+- Résolution des tuiles améliorée : simplification 250m au lieu de 500m
 
 ### Fixed
 - Reprojection Lambert-93 (EPSG:2154) → WGS84 (EPSG:4326) avec ST_FlipCoordinates

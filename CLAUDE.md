@@ -57,10 +57,14 @@ en France, basé sur les données ouvertes ARCEP/ANFR. Side-project data enginee
 
 ## Données chargées (état actuel)
 - 4 opérateurs : Orange (OF), Bouygues (BYT), Free (FREE), SFR (SFR)
-- Technologie : 4G uniquement pour l'instant
-- Trimestre : 2025_T3 (données ARCEP publiées déc. 2025)
-- 1148 géométries MULTIPOLYGON dans raw_coverage
-- Codes fichiers ARCEP : BOUY, FREE, OF, SFR0 (≠ codes DB : BYT, FREE, OF, SFR)
+- **raw_coverage** : 1148 géométries MULTIPOLYGON (4G, trimestre 2025_T3)
+  - Codes fichiers ARCEP : BOUY, FREE, OF, SFR0 (≠ codes DB : BYT, FREE, OF, SFR)
+  - Coordonnées en Lambert-93 (EPSG:2154)
+- **raw_antenna_sites** : 354k sites d'antennes ANFR (2G/3G/4G/5G)
+  - Source : data.gouv.fr, dataset "installations radioélectriques > 5 watts"
+  - ADM_ID ANFR → opérateur : 23=OF, 6=BYT, 240=FREE, 137=SFR
+  - Coordonnées en WGS84 (converties depuis DMS)
+  - Systèmes : GSM%=2G, UMTS%=3G, LTE%=4G, 5G NR%=5G
 
 ## Règles de sécurité
 - Ne jamais commiter de clés API dans le code
