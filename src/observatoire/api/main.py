@@ -3,8 +3,10 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from observatoire.api.routers import antennas, coverage, stats
 from observatoire.api.schemas.common import HealthResponse
@@ -48,3 +50,11 @@ async def health_check() -> HealthResponse:
     tables = conn.execute("SHOW TABLES").fetchall()
     conn.close()
     return HealthResponse(status="ok", tables=len(tables))
+
+
+# Servir le frontend statique (APRÈS les routes API pour éviter les conflits)
+_frontend_dir = Path(__file__).parent.parent.parent.parent / "frontend"
+if _frontend_dir.exists():
+    app.mount("/css", StaticFiles(directory=_frontend_dir / "css"), name="css")
+    app.mount("/js", StaticFiles(directory=_frontend_dir / "js"), name="js")
+    app.mount("/", StaticFiles(directory=_frontend_dir, html=True), name="frontend")

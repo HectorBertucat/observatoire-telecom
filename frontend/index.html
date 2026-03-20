@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observatoire Télécom France</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <header>
+        <h1>Observatoire Télécom France</h1>
+        <p class="subtitle">Couverture et qualité des réseaux mobiles</p>
+    </header>
+
+    <nav class="controls">
+        <div class="control-group">
+            <label for="department-select">Département</label>
+            <select id="department-select">
+                <option value="">-- Sélectionner --</option>
+                <option value="31">31 - Haute-Garonne</option>
+                <option value="33">33 - Gironde</option>
+                <option value="69">69 - Rhône</option>
+                <option value="75">75 - Paris</option>
+                <option value="13">13 - Bouches-du-Rhône</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="tech-select">Technologie</label>
+            <select id="tech-select">
+                <option value="4G" selected>4G</option>
+                <option value="2G">2G</option>
+                <option value="3G">3G</option>
+                <option value="5G">5G</option>
+            </select>
+        </div>
+        <button id="btn-search" onclick="loadData()">Rechercher</button>
+    </nav>
+
+    <main>
+        <div class="dashboard">
+            <section class="map-container">
+                <h2>Carte de couverture</h2>
+                <div id="map"></div>
+            </section>
+
+            <section class="charts-container">
+                <div class="chart-box">
+                    <h2>Couverture par opérateur</h2>
+                    <canvas id="coverage-chart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h2>Nombre d'antennes</h2>
+                    <canvas id="antennas-chart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <section class="stats-section">
+            <h2>Statistiques de la base</h2>
+            <div id="stats-grid" class="stats-grid">
+                <p class="placeholder">Sélectionnez un département pour afficher les données.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Données : ARCEP / ANFR — Licence Ouverte</p>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/js/map.js"></script>
+    <script src="/js/charts.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
