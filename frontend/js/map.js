@@ -262,6 +262,57 @@ function updateLegend(operator) {
     });
 }
 
+// Clic droit → recherche antennes proches
+map.on("contextmenu", async (e) => {
+    e.preventDefault();
+    const { lng, lat } = e.lngLat;
+
+    try {
+        const res = await fetch(
+            `/api/v1/antennas/nearby?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&radius=2&limit=10`
+        );
+        const data = await res.json();
+
+        if (data.length === 0) {
+            new maplibregl.Popup({ maxWidth: "280px" })
+                .setLngLat(e.lngLat)
+                .setHTML(`<div style="font-size:13px">Aucune antenne dans un rayon de 2km</div>`)
+                .addTo(map);
+            return;
+        }
+
+        // Compter par opérateur
+        const byOp = {};
+        data.forEach((a) => {
+            const key = a.operator;
+            byOp[key] = (byOp[key] || 0) + 1;
+        });
+
+        const opLines = Object.entries(byOp)
+            .map(([op, count]) => {
+                const info = OPERATORS[op] || { name: op, color: "#999" };
+                const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${info.color};margin-right:4px"></span>`;
+                return `${dot}${info.name}: ${count}`;
+            })
+            .join("<br>");
+
+        const nearest = data[0];
+        new maplibregl.Popup({ maxWidth: "280px" })
+            .setLngLat(e.lngLat)
+            .setHTML(
+                `<div style="font-size:13px">` +
+                `<b>${data.length} antennes</b> dans 2km<br>` +
+                `<span style="color:#666">Plus proche: ${nearest.operator} ${nearest.technology} (${nearest.distance_km}km)</span>` +
+                `<hr style="margin:4px 0;border:none;border-top:1px solid #eee">` +
+                opLines +
+                `</div>`
+            )
+            .addTo(map);
+    } catch (err) {
+        console.error("Erreur nearby:", err);
+    }
+});
+
 // Construire la légende + indicateur de zoom
 map.on("load", () => {
     buildLegend();

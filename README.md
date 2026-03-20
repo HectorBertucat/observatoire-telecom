@@ -2,6 +2,8 @@
 
 Observatoire open-source de la couverture et de la qualite des reseaux mobiles en France, alimente par les donnees ouvertes de l'ARCEP et de l'ANFR.
 
+![Dashboard](docs/screenshot.png)
+
 ## Fonctionnalites
 
 - **Carte interactive** des couvertures 4G (Orange, Bouygues, Free, SFR) avec vector tiles et zoom progressif
