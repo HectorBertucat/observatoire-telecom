@@ -27,6 +27,11 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - Antennes ANFR affichées comme points sur la carte (z8+, 354k sites)
 - PMTiles séparé pour les antennes avec clustering Tippecanoe (19 MB)
 - Popup au clic sur antenne : opérateur, technologie, commune
+- Dashboard stats enrichies : total sites, 4G, 5G, opérateurs
+- Graphique stacked bars : sites d'antennes par opérateur × technologie
+- API antennes : endpoints /antennas/ et /antennas/stats avec pagination/filtres
+- README complet avec guide de démarrage, API, architecture
+- Licence MIT
 
 ### Fixed
 - Reprojection Lambert-93 (EPSG:2154) → WGS84 (EPSG:4326) avec ST_FlipCoordinates
