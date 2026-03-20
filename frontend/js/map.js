@@ -262,7 +262,15 @@ function updateLegend(operator) {
     });
 }
 
-// Construire la légende une fois la carte chargée
+// Construire la légende + indicateur de zoom
 map.on("load", () => {
     buildLegend();
+});
+
+map.on("zoomend", () => {
+    const indicator = document.getElementById("zoom-indicator");
+    if (indicator) {
+        const z = map.getZoom().toFixed(1);
+        indicator.textContent = `z${z}`;
+    }
 });

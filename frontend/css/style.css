@@ -180,6 +180,19 @@ main {
     color: var(--color-text);
 }
 
+.zoom-indicator {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: var(--radius);
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    color: var(--color-muted);
+    font-weight: 600;
+}
+
 .charts-container {
     display: flex;
     flex-direction: column;

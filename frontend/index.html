@@ -31,6 +31,7 @@
             </select>
         </div>
         <button onclick="applyFilter()">Afficher</button>
+        <button onclick="resetView()" class="btn-secondary">France</button>
     </nav>
 
     <main>
@@ -38,6 +39,7 @@
             <section class="map-container">
                 <h2>Carte de couverture</h2>
                 <div id="map">
+                    <div id="zoom-indicator" class="zoom-indicator">z5.5</div>
                     <div id="map-legend" class="map-legend"></div>
                 </div>
             </section>

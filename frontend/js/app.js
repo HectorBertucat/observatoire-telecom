@@ -11,6 +11,13 @@ function applyFilter() {
 }
 
 /**
+ * Recentre la vue sur la France métropolitaine.
+ */
+function resetView() {
+    map.flyTo({ center: [2.888, 46.603], zoom: 5.5, duration: 1 });
+}
+
+/**
  * Crée une carte de statistique via DOM API.
  */
 function createStatCard(label, value, subtitle) {
