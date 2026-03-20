@@ -145,10 +145,13 @@ def generate_pmtiles(coverage_path: Path, antennas_path: Path) -> Path:
     result = subprocess.run(
         [
             "tippecanoe",
-            "-o", str(dest),
+            "-o",
+            str(dest),
             "--force",
-            "--name", "Observatoire Télécom",
-            "-L", f"coverage:{coverage_path}",
+            "--name",
+            "Observatoire Télécom",
+            "-L",
+            f"coverage:{coverage_path}",
             "--minimum-zoom=4",
             "--maximum-zoom=12",
             "--no-feature-limit",
@@ -173,14 +176,19 @@ def generate_pmtiles(coverage_path: Path, antennas_path: Path) -> Path:
     result2 = subprocess.run(
         [
             "tippecanoe",
-            "-o", str(antennas_dest),
+            "-o",
+            str(antennas_dest),
             "--force",
-            "--name", "Antennes Télécom",
-            "--layer", "antennas",
-            "--minimum-zoom", "7",          # Points visibles à partir de z7
-            "--maximum-zoom", "14",
-            "--drop-densest-as-needed",     # Cluster aux zooms bas
-            "--cluster-distance=50",        # Distance de clustering en pixels
+            "--name",
+            "Antennes Télécom",
+            "--layer",
+            "antennas",
+            "--minimum-zoom",
+            "7",  # Points visibles à partir de z7
+            "--maximum-zoom",
+            "14",
+            "--drop-densest-as-needed",  # Cluster aux zooms bas
+            "--cluster-distance=50",  # Distance de clustering en pixels
             str(antennas_path),
         ],
         capture_output=True,

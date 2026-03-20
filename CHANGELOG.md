@@ -32,6 +32,9 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - API antennes : endpoints /antennas/ et /antennas/stats avec pagination/filtres
 - README complet avec guide de démarrage, API, architecture
 - Licence MIT
+- 5 nouveaux tests API antennes (26 tests total)
+- MCP tools refactorisés pour utiliser les données réelles (ANFR)
+  - get_antenna_count, compare_operators, get_coverage_summary, search_antennas
 
 ### Fixed
 - Reprojection Lambert-93 (EPSG:2154) → WGS84 (EPSG:4326) avec ST_FlipCoordinates

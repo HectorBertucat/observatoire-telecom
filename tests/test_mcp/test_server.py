@@ -12,9 +12,10 @@ async def test_mcp_lists_tools():
     """Vérifie que les tools MCP sont enregistrés."""
     tools = await mcp.list_tools()
     tool_names = [t.name for t in tools]
-    assert "get_coverage" in tool_names
+    assert "get_antenna_count" in tool_names
     assert "compare_operators" in tool_names
-    assert "get_antenna_density" in tool_names
+    assert "get_coverage_summary" in tool_names
+    assert "search_antennas" in tool_names
 
 
 async def test_mcp_lists_prompts():
