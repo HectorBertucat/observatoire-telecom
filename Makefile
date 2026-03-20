@@ -1,0 +1,30 @@
+.PHONY: help ingest serve test lint format mcp clean
+
+help: ## Affiche cette aide
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
+
+ingest: ## Lance le pipeline d'ingestion complet
+	uv run python -m observatoire.ingestion.loader
+
+serve: ## Lance l'API en mode développement
+	uv run uvicorn observatoire.api.main:app --reload --host 0.0.0.0 --port 8000
+
+test: ## Lance les tests
+	uv run pytest -v
+
+lint: ## Vérifie le code (ruff + mypy)
+	uv run ruff check src/ tests/
+	uv run ruff format --check src/ tests/
+	uv run mypy src/
+
+format: ## Formate le code automatiquement
+	uv run ruff format src/ tests/
+	uv run ruff check --fix src/ tests/
+
+mcp: ## Lance le serveur MCP
+	uv run python -m observatoire.mcp.server
+
+clean: ## Nettoie les fichiers temporaires
+	rm -rf data/raw/* data/processed/*
+	find . -type d -name __pycache__ -exec rm -rf {} +
