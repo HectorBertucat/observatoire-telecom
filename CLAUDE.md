@@ -65,7 +65,11 @@ en France, basé sur les données ouvertes ARCEP/ANFR. Side-project data enginee
   - Source : data.gouv.fr, dataset "installations radioélectriques > 5 watts"
   - ADM_ID ANFR → opérateur : 23=OF, 6=BYT, 240=FREE, 137=SFR
   - Coordonnées en WGS84 (converties depuis DMS)
+  - commune_code = COM_CD_INSEE (code INSEE), department_code = 2 premiers chiffres
   - Systèmes : GSM%=2G, UMTS%=3G, LTE%=4G, 5G NR%=5G
+- **PMTiles** : coverage.pmtiles (141 MB, z4-z12) + antennas.pmtiles (19 MB, z7-z14)
+- **5 MCP tools** : get_antenna_count, compare_operators, get_coverage_summary,
+  search_antennas, find_nearby_antennas
 
 ## Règles de sécurité
 - Ne jamais commiter de clés API dans le code
