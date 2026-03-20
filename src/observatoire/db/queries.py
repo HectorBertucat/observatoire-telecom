@@ -69,6 +69,75 @@ def get_raw_coverage_stats(
     return [dict(zip(columns, row, strict=True)) for row in result]
 
 
+def get_antenna_stats(
+    conn: duckdb.DuckDBPyConnection,
+    operator: str | None = None,
+) -> list[dict]:
+    """Retourne les stats d'antennes par opérateur et technologie."""
+    params: list = []
+    where = ""
+    if operator:
+        where = "WHERE operator = ?"
+        params.append(operator)
+
+    result = conn.execute(
+        f"""
+        SELECT
+            operator,
+            technology,
+            COUNT(*) AS site_count
+        FROM raw_antenna_sites
+        {where}
+        GROUP BY operator, technology
+        ORDER BY operator, technology
+        """,
+        params,
+    ).fetchall()
+
+    columns = ["operator", "technology", "site_count"]
+    return [dict(zip(columns, row, strict=True)) for row in result]
+
+
+def get_antenna_list(
+    conn: duckdb.DuckDBPyConnection,
+    operator: str | None = None,
+    technology: str | None = None,
+    commune_code: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict]:
+    """Retourne une liste paginée de sites d'antennes."""
+    conditions = []
+    params: list = []
+
+    if operator:
+        conditions.append("operator = ?")
+        params.append(operator)
+    if technology:
+        conditions.append("technology = ?")
+        params.append(technology)
+    if commune_code:
+        conditions.append("commune_code = ?")
+        params.append(commune_code)
+
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    params.extend([limit, offset])
+
+    result = conn.execute(
+        f"""
+        SELECT id, operator, latitude, longitude, commune_code, technology
+        FROM raw_antenna_sites
+        {where}
+        ORDER BY operator, technology, id
+        LIMIT ? OFFSET ?
+        """,
+        params,
+    ).fetchall()
+
+    columns = ["id", "operator", "latitude", "longitude", "commune_code", "technology"]
+    return [dict(zip(columns, row, strict=True)) for row in result]
+
+
 def get_coverage_geojson(operator_code: str, technology: str = "4G") -> dict:
     """Retourne le GeoJSON pré-simplifié depuis le fichier statique."""
     geojson_dir = settings.data_dir / "geojson"
@@ -79,23 +148,6 @@ def get_coverage_geojson(operator_code: str, technology: str = "4G") -> dict:
         return {"type": "FeatureCollection", "features": []}
 
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def list_available_geojson() -> list[dict]:
-    """Liste les fichiers GeoJSON disponibles avec leur taille."""
-    geojson_dir = settings.data_dir / "geojson"
-    if not geojson_dir.exists():
-        return []
-
-    files = []
-    for path in sorted(geojson_dir.glob("*.geojson")):
-        files.append(
-            {
-                "filename": path.name,
-                "size_kb": round(path.stat().st_size / 1024),
-            }
-        )
-    return files
 
 
 def get_table_counts(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:

@@ -7,50 +7,74 @@ const CHART_OPERATOR_COLORS = {
     FREE: "#CD1719",
 };
 
-const OPERATOR_NAMES = {
+const CHART_OPERATOR_NAMES = {
     OF: "Orange",
     SFR: "SFR",
     BYT: "Bouygues",
     FREE: "Free",
 };
 
-let coverageChart = null;
+const TECH_COLORS = {
+    "2G": "#94a3b8",
+    "3G": "#60a5fa",
+    "4G": "#34d399",
+    "5G": "#a78bfa",
+};
+
+let antennasChart = null;
 
 /**
- * Met à jour le graphique de géométries par opérateur.
+ * Met à jour le graphique d'antennes par opérateur et technologie.
  */
-function updateCoverageChart(data) {
-    const ctx = document.getElementById("coverage-chart").getContext("2d");
+function updateAntennasChart(data) {
+    const ctx = document.getElementById("antennas-chart").getContext("2d");
+    if (antennasChart) antennasChart.destroy();
 
-    if (coverageChart) coverageChart.destroy();
+    // Grouper par opérateur
+    const operators = [...new Set(data.map((d) => d.operator))];
+    const technologies = ["2G", "3G", "4G", "5G"];
 
-    const labels = data.map((d) => OPERATOR_NAMES[d.operator] || d.operator_name || d.operator);
-    const values = data.map((d) => d.geometry_count);
-    const colors = data.map((d) => CHART_OPERATOR_COLORS[d.operator] || "#999");
+    const datasets = technologies.map((tech) => ({
+        label: tech,
+        data: operators.map((op) => {
+            const entry = data.find((d) => d.operator === op && d.technology === tech);
+            return entry ? entry.site_count : 0;
+        }),
+        backgroundColor: TECH_COLORS[tech],
+        borderRadius: 3,
+    }));
 
-    coverageChart = new Chart(ctx, {
+    antennasChart = new Chart(ctx, {
         type: "bar",
         data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: "Polygones de couverture",
-                    data: values,
-                    backgroundColor: colors,
-                    borderRadius: 4,
-                },
-            ],
+            labels: operators.map((op) => CHART_OPERATOR_NAMES[op] || op),
+            datasets: datasets,
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
+                x: { stacked: true },
                 y: {
+                    stacked: true,
                     beginAtZero: true,
-                    title: { display: true, text: "Nombre de polygones" },
+                    title: { display: true, text: "Nombre de sites" },
+                    ticks: {
+                        callback: (v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v,
+                    },
                 },
             },
-            plugins: { legend: { display: false } },
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: { boxWidth: 12, padding: 8, font: { size: 11 } },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `${ctx.dataset.label}: ${ctx.raw.toLocaleString("fr-FR")} sites`,
+                    },
+                },
+            },
         },
     });
 }

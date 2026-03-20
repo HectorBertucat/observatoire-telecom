@@ -6,7 +6,7 @@ import duckdb
 from fastapi import APIRouter, Depends, Query
 
 from observatoire.api.deps import get_db
-from observatoire.db.queries import get_raw_coverage_stats, get_table_counts
+from observatoire.db.queries import get_antenna_stats, get_raw_coverage_stats, get_table_counts
 
 router = APIRouter()
 
@@ -18,8 +18,17 @@ async def coverage_stats(
     db: DB,
     technology: str = Query("4G", description="Technologie réseau"),
 ):
-    """Retourne les stats de couverture par opérateur depuis les données brutes."""
+    """Retourne les stats de couverture par opérateur."""
     return get_raw_coverage_stats(db, technology)
+
+
+@router.get("/antennas")
+async def antenna_stats(
+    db: DB,
+    operator: str | None = Query(None, description="Code opérateur"),
+):
+    """Retourne les stats d'antennes par opérateur et technologie."""
+    return get_antenna_stats(db, operator)
 
 
 @router.get("/tables")

@@ -11,73 +11,81 @@ function applyFilter() {
 }
 
 /**
- * Charge les stats de couverture.
- */
-async function loadStats(technology) {
-    try {
-        const response = await fetch(`${API_BASE}/stats/coverage?technology=${technology}`);
-        const data = await response.json();
-        if (data.length > 0) {
-            updateCoverageChart(data);
-        }
-    } catch (error) {
-        console.error("Erreur chargement stats:", error);
-    }
-}
-
-/**
  * Crée une carte de statistique via DOM API.
  */
-function createStatCard(table, count) {
+function createStatCard(label, value, subtitle) {
     const card = document.createElement("div");
     card.className = "stat-card";
 
     const valueEl = document.createElement("div");
     valueEl.className = "value";
-    valueEl.textContent = count.toLocaleString("fr-FR");
+    valueEl.textContent = typeof value === "number" ? value.toLocaleString("fr-FR") : value;
 
     const labelEl = document.createElement("div");
     labelEl.className = "label";
-    labelEl.textContent = table;
+    labelEl.textContent = label;
 
     card.appendChild(valueEl);
     card.appendChild(labelEl);
+
+    if (subtitle) {
+        const subEl = document.createElement("div");
+        subEl.className = "label";
+        subEl.style.fontSize = "0.7rem";
+        subEl.style.marginTop = "2px";
+        subEl.textContent = subtitle;
+        card.appendChild(subEl);
+    }
+
     return card;
 }
 
 /**
- * Met à jour la grille de statistiques.
+ * Met à jour la grille de statistiques avec des données enrichies.
  */
-function updateStatsGrid(counts) {
+async function updateStats() {
     const grid = document.getElementById("stats-grid");
+    while (grid.firstChild) grid.removeChild(grid.firstChild);
 
-    while (grid.firstChild) {
-        grid.removeChild(grid.firstChild);
-    }
+    try {
+        // Charger stats tables + antennes en parallèle
+        const [tablesRes, antennasRes] = await Promise.all([
+            fetch(`${API_BASE}/stats/tables`),
+            fetch(`${API_BASE}/stats/antennas`),
+        ]);
 
-    const entries = Object.entries(counts);
-    if (entries.length === 0) {
+        const tables = await tablesRes.json();
+        const antennas = await antennasRes.json();
+
+        // Calculs
+        const totalAntennas = antennas.reduce((sum, a) => sum + a.site_count, 0);
+        const total4G = antennas
+            .filter((a) => a.technology === "4G")
+            .reduce((sum, a) => sum + a.site_count, 0);
+        const total5G = antennas
+            .filter((a) => a.technology === "5G")
+            .reduce((sum, a) => sum + a.site_count, 0);
+        const coveragePolygons = tables["raw_coverage"] || 0;
+        const operators = new Set(antennas.map((a) => a.operator)).size;
+
+        grid.appendChild(createStatCard("Sites d'antennes", totalAntennas, "Toutes technologies"));
+        grid.appendChild(createStatCard("Sites 4G", total4G, "LTE"));
+        grid.appendChild(createStatCard("Sites 5G", total5G, "NR"));
+        grid.appendChild(createStatCard("Opérateurs", operators, "Métropole"));
+        grid.appendChild(createStatCard("Polygones couverture", coveragePolygons, "ARCEP 4G"));
+
+        // Mettre à jour le graphique
+        updateAntennasChart(antennas);
+    } catch (error) {
+        console.error("Erreur chargement stats:", error);
         const placeholder = document.createElement("p");
         placeholder.className = "placeholder";
-        placeholder.textContent = "Aucune donnée disponible.";
+        placeholder.textContent = "Erreur de chargement.";
         grid.appendChild(placeholder);
-        return;
-    }
-
-    for (const [table, count] of entries) {
-        grid.appendChild(createStatCard(table, count));
     }
 }
 
 // Chargement initial
-document.addEventListener("DOMContentLoaded", async () => {
-    try {
-        const tablesRes = await fetch(`${API_BASE}/stats/tables`);
-        const counts = await tablesRes.json();
-        updateStatsGrid(counts);
-
-        await loadStats("4G");
-    } catch (error) {
-        console.error("Erreur chargement initial:", error);
-    }
+document.addEventListener("DOMContentLoaded", () => {
+    updateStats();
 });
