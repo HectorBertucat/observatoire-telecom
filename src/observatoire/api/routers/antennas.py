@@ -1,6 +1,6 @@
 """Endpoints antennes ANFR."""
 
-from typing import Annotated
+from typing import Annotated, Any
 
 import duckdb
 from fastapi import APIRouter, Depends, Query
@@ -17,7 +17,7 @@ DB = Annotated[duckdb.DuckDBPyConnection, Depends(get_db)]
 async def antenna_stats(
     db: DB,
     operator: str | None = Query(None, description="Code opérateur (BYT, FREE, OF, SFR)"),
-):
+) -> list[dict[str, Any]]:
     """Retourne le nombre de sites par opérateur et technologie."""
     return get_antenna_stats(db, operator)
 
@@ -26,7 +26,7 @@ async def antenna_stats(
 async def commune_antennas(
     commune_code: str,
     db: DB,
-):
+) -> dict[str, Any]:
     """Résumé des antennes pour une commune (code INSEE)."""
     return search_commune_antennas(db, commune_code)
 
@@ -39,6 +39,6 @@ async def list_antennas(
     commune: str | None = Query(None, description="Code INSEE commune"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-):
+) -> list[dict[str, Any]]:
     """Liste les sites d'antennes avec filtres et pagination."""
     return get_antenna_list(db, operator, technology, commune, limit, offset)

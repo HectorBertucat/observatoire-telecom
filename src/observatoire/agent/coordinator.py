@@ -1,5 +1,7 @@
 """Agent coordinateur pour l'analyse télécom."""
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
@@ -22,7 +24,7 @@ class AnalysisReport(BaseModel):
 
     zone: str
     summary: str
-    coverage_data: dict
+    coverage_data: dict[str, Any]
     insights: list[str]
     recommendations: list[str]
 

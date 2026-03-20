@@ -1,6 +1,7 @@
 """Requêtes SQL métier réutilisables."""
 
 import json
+from typing import Any
 
 import duckdb
 
@@ -11,7 +12,7 @@ def get_commune_coverage(
     conn: duckdb.DuckDBPyConnection,
     commune_code: str,
     technology: str = "4G",
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Retourne la couverture d'une commune par opérateur."""
     result = conn.execute(
         """
@@ -46,7 +47,7 @@ def get_commune_coverage(
 def get_raw_coverage_stats(
     conn: duckdb.DuckDBPyConnection,
     technology: str = "4G",
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Retourne les stats de couverture par opérateur depuis raw_coverage."""
     result = conn.execute(
         """
@@ -72,9 +73,9 @@ def get_raw_coverage_stats(
 def get_antenna_stats(
     conn: duckdb.DuckDBPyConnection,
     operator: str | None = None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Retourne les stats d'antennes par opérateur et technologie."""
-    params: list = []
+    params: list[Any] = []
     where = ""
     if operator:
         where = "WHERE operator = ?"
@@ -105,10 +106,10 @@ def get_antenna_list(
     commune_code: str | None = None,
     limit: int = 100,
     offset: int = 0,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Retourne une liste paginée de sites d'antennes."""
-    conditions = []
-    params: list = []
+    conditions: list[str] = []
+    params: list[Any] = []
 
     if operator:
         conditions.append("operator = ?")
@@ -138,7 +139,7 @@ def get_antenna_list(
     return [dict(zip(columns, row, strict=True)) for row in result]
 
 
-def get_coverage_geojson(operator_code: str, technology: str = "4G") -> dict:
+def get_coverage_geojson(operator_code: str, technology: str = "4G") -> dict[str, Any]:
     """Retourne le GeoJSON pré-simplifié depuis le fichier statique."""
     geojson_dir = settings.data_dir / "geojson"
     filename = f"coverage_{operator_code}_{technology}.geojson"
@@ -147,13 +148,14 @@ def get_coverage_geojson(operator_code: str, technology: str = "4G") -> dict:
     if not path.exists():
         return {"type": "FeatureCollection", "features": []}
 
-    return json.loads(path.read_text(encoding="utf-8"))
+    result: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return result
 
 
 def search_commune_antennas(
     conn: duckdb.DuckDBPyConnection,
     commune_code: str,
-) -> dict:
+) -> dict[str, Any]:
     """Retourne un résumé des antennes pour une commune."""
     result = conn.execute(
         """

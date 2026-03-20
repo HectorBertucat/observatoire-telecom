@@ -1,6 +1,6 @@
 """Endpoints statistiques agrégées."""
 
-from typing import Annotated
+from typing import Annotated, Any
 
 import duckdb
 from fastapi import APIRouter, Depends, Query
@@ -17,7 +17,7 @@ DB = Annotated[duckdb.DuckDBPyConnection, Depends(get_db)]
 async def coverage_stats(
     db: DB,
     technology: str = Query("4G", description="Technologie réseau"),
-):
+) -> list[dict[str, Any]]:
     """Retourne les stats de couverture par opérateur."""
     return get_raw_coverage_stats(db, technology)
 
@@ -26,12 +26,12 @@ async def coverage_stats(
 async def antenna_stats(
     db: DB,
     operator: str | None = Query(None, description="Code opérateur"),
-):
+) -> list[dict[str, Any]]:
     """Retourne les stats d'antennes par opérateur et technologie."""
     return get_antenna_stats(db, operator)
 
 
 @router.get("/tables")
-async def table_counts(db: DB):
+async def table_counts(db: DB) -> dict[str, int]:
     """Retourne le nombre de lignes par table (debug/monitoring)."""
     return get_table_counts(db)

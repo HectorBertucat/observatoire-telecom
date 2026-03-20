@@ -1,6 +1,6 @@
 """Endpoints de couverture réseau."""
 
-from typing import Annotated
+from typing import Annotated, Any
 
 import duckdb
 from fastapi import APIRouter, Depends, Query
@@ -19,7 +19,7 @@ async def commune_coverage(
     commune_code: str,
     db: DB,
     technology: str = Query("4G", description="Technologie réseau"),
-):
+) -> list[dict[str, Any]]:
     """Retourne la couverture d'une commune pour tous les opérateurs."""
     return get_commune_coverage(db, commune_code, technology)
 
@@ -28,7 +28,7 @@ async def commune_coverage(
 async def coverage_geojson(
     operator: str = Query("OF", description="Code opérateur (BYT, FREE, OF, SFR)"),
     technology: str = Query("4G", description="Technologie réseau"),
-):
+) -> dict[str, Any]:
     """Retourne les polygones de couverture simplifiés en GeoJSON.
 
     Sert des fichiers pré-générés (~500-850 KB par opérateur) avec
