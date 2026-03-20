@@ -3,55 +3,11 @@
 const API_BASE = "/api/v1";
 
 /**
- * Charge les données au clic sur Afficher.
+ * Applique le filtre opérateur sur la carte.
  */
-async function loadData() {
+function applyFilter() {
     const operator = document.getElementById("operator-select").value;
-    const technology = document.getElementById("tech-select").value;
-
-    if (!operator) return;
-
-    setLoading(true);
-    clearCoverageLayers();
-
-    await loadCoverageLayer(operator, technology);
-    // Recentrer sur la France après chargement
-    map.setView([46.603, 2.888], 6);
-
-    await loadStats(technology);
-    setLoading(false);
-}
-
-/**
- * Charge toutes les couvertures (tous opérateurs) sur la carte.
- */
-async function loadAllOperators() {
-    const technology = document.getElementById("tech-select").value;
-
-    setLoading(true);
-    clearCoverageLayers();
-
-    const operators = ["OF", "BYT", "FREE", "SFR"];
-    await Promise.all(operators.map((op) => loadCoverageLayer(op, technology)));
-
-    map.setView([46.603, 2.888], 6);
-    await loadStats(technology);
-    setLoading(false);
-}
-
-/**
- * Affiche/masque l'indicateur de chargement.
- */
-function setLoading(loading) {
-    const buttons = document.querySelectorAll("nav button");
-    buttons.forEach((btn) => {
-        btn.disabled = loading;
-        if (loading) {
-            btn.style.opacity = "0.6";
-        } else {
-            btn.style.opacity = "1";
-        }
-    });
+    filterByOperator(operator);
 }
 
 /**
@@ -61,7 +17,6 @@ async function loadStats(technology) {
     try {
         const response = await fetch(`${API_BASE}/stats/coverage?technology=${technology}`);
         const data = await response.json();
-
         if (data.length > 0) {
             updateCoverageChart(data);
         }

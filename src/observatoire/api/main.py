@@ -52,6 +52,11 @@ async def health_check() -> HealthResponse:
     return HealthResponse(status="ok", tables=len(tables))
 
 
+# Servir les tuiles PMTiles
+_tiles_dir = Path(__file__).parent.parent.parent.parent / "data" / "tiles"
+if _tiles_dir.exists():
+    app.mount("/tiles", StaticFiles(directory=_tiles_dir), name="tiles")
+
 # Servir le frontend statique (APRÈS les routes API pour éviter les conflits)
 _frontend_dir = Path(__file__).parent.parent.parent.parent / "frontend"
 if _frontend_dir.exists():

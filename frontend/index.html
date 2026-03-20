@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Observatoire Télécom France</title>
     <link rel="stylesheet" href="/css/style.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
 </head>
 <body>
     <header>
@@ -17,6 +17,7 @@
         <div class="control-group">
             <label for="operator-select">Opérateur</label>
             <select id="operator-select">
+                <option value="all" selected>Tous</option>
                 <option value="OF">Orange</option>
                 <option value="BYT">Bouygues Telecom</option>
                 <option value="FREE">Free Mobile</option>
@@ -27,13 +28,9 @@
             <label for="tech-select">Technologie</label>
             <select id="tech-select">
                 <option value="4G" selected>4G</option>
-                <option value="2G">2G</option>
-                <option value="3G">3G</option>
-                <option value="5G">5G</option>
             </select>
         </div>
-        <button onclick="loadData()">Afficher</button>
-        <button onclick="loadAllOperators()" class="btn-secondary">Tous les opérateurs</button>
+        <button onclick="applyFilter()">Afficher</button>
     </nav>
 
     <main>
@@ -63,7 +60,8 @@
         <p>Données : ARCEP / ANFR — Licence Ouverte</p>
     </footer>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/pmtiles@3.2.1/dist/pmtiles.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/js/map.js"></script>
     <script src="/js/charts.js"></script>
