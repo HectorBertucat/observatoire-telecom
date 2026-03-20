@@ -3,42 +3,53 @@
 const API_BASE = "/api/v1";
 
 /**
- * Charge les données pour le département sélectionné.
+ * Charge les données au clic sur Rechercher.
  */
 async function loadData() {
-    const department = document.getElementById("department-select").value;
+    const operator = document.getElementById("operator-select").value;
     const technology = document.getElementById("tech-select").value;
 
-    if (!department) {
-        alert("Veuillez sélectionner un département.");
+    if (!operator) {
+        alert("Veuillez sélectionner un opérateur.");
         return;
     }
 
-    // Mettre à jour la carte
-    updateMap(department);
+    // Charger la couverture sur la carte
+    clearCoverageLayers();
+    await loadCoverageLayer(operator, technology);
 
-    // Charger les stats département
+    // Charger les stats globales
+    await loadStats(technology);
+}
+
+/**
+ * Charge toutes les couvertures (tous opérateurs) sur la carte.
+ */
+async function loadAllOperators() {
+    const technology = document.getElementById("tech-select").value;
+    clearCoverageLayers();
+
+    const operators = ["OF", "BYT", "FREE", "SFR"];
+    for (const op of operators) {
+        await loadCoverageLayer(op, technology);
+    }
+
+    await loadStats(technology);
+}
+
+/**
+ * Charge les stats de couverture.
+ */
+async function loadStats(technology) {
     try {
-        const response = await fetch(
-            `${API_BASE}/stats/department/${department}?technology=${technology}`
-        );
+        const response = await fetch(`${API_BASE}/stats/coverage?technology=${technology}`);
         const data = await response.json();
 
         if (data.length > 0) {
             updateCoverageChart(data);
-            updateAntennasChart(data);
         }
     } catch (error) {
         console.error("Erreur chargement stats:", error);
-    }
-
-    // Charger les comptages de tables
-    try {
-        const response = await fetch(`${API_BASE}/stats/tables`);
-        const counts = await response.json();
-        updateStatsGrid(counts);
-    } catch (error) {
-        console.error("Erreur chargement tables:", error);
     }
 }
 
@@ -68,7 +79,6 @@ function createStatCard(table, count) {
 function updateStatsGrid(counts) {
     const grid = document.getElementById("stats-grid");
 
-    // Vider le contenu existant
     while (grid.firstChild) {
         grid.removeChild(grid.firstChild);
     }
@@ -87,12 +97,16 @@ function updateStatsGrid(counts) {
     }
 }
 
-// Charger les stats au démarrage
+// Chargement initial
 document.addEventListener("DOMContentLoaded", async () => {
     try {
-        const response = await fetch(`${API_BASE}/stats/tables`);
-        const counts = await response.json();
+        // Stats tables
+        const tablesRes = await fetch(`${API_BASE}/stats/tables`);
+        const counts = await tablesRes.json();
         updateStatsGrid(counts);
+
+        // Stats couverture
+        await loadStats("4G");
     } catch (error) {
         console.error("Erreur chargement initial:", error);
     }

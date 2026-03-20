@@ -1,6 +1,5 @@
 /* Initialisation et gestion de la carte Leaflet */
 
-// Carte centrée sur la France métropolitaine
 const map = L.map("map").setView([46.603, 2.888], 6);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -8,29 +7,56 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 18,
 }).addTo(map);
 
-// Couche GeoJSON pour les données de couverture
-let coverageLayer = null;
+const OPERATOR_COLORS = {
+    OF: "#FF6600",
+    SFR: "#E4002B",
+    BYT: "#003DA5",
+    FREE: "#CD1719",
+};
+
+let coverageLayers = {};
 
 /**
- * Charge et affiche les données GeoJSON de couverture sur la carte.
+ * Charge et affiche les polygones de couverture pour un opérateur.
  */
-function updateMap(department) {
-    if (!department) return;
-
-    // Coordonnées approximatives des chefs-lieux de département
-    const deptCenters = {
-        "13": [43.3, 5.4],
-        "31": [43.6, 1.44],
-        "33": [44.84, -0.58],
-        "69": [45.76, 4.84],
-        "75": [48.86, 2.35],
-    };
-
-    const center = deptCenters[department] || [46.603, 2.888];
-    map.setView(center, 9);
-
-    // Supprimer l'ancienne couche si existante
-    if (coverageLayer) {
-        map.removeLayer(coverageLayer);
+async function loadCoverageLayer(operator, technology) {
+    // Supprimer l'ancienne couche de cet opérateur
+    if (coverageLayers[operator]) {
+        map.removeLayer(coverageLayers[operator]);
     }
+
+    try {
+        const response = await fetch(
+            `/api/v1/coverage/geojson?operator=${operator}&technology=${technology}`
+        );
+        const geojson = await response.json();
+
+        if (geojson.features.length === 0) return;
+
+        const color = OPERATOR_COLORS[operator] || "#999";
+
+        coverageLayers[operator] = L.geoJSON(geojson, {
+            style: {
+                color: color,
+                weight: 1,
+                fillColor: color,
+                fillOpacity: 0.3,
+            },
+        }).addTo(map);
+
+        // Ajuster la vue sur la couche
+        map.fitBounds(coverageLayers[operator].getBounds());
+    } catch (error) {
+        console.error(`Erreur chargement couverture ${operator}:`, error);
+    }
+}
+
+/**
+ * Supprime toutes les couches de couverture.
+ */
+function clearCoverageLayers() {
+    for (const key of Object.keys(coverageLayers)) {
+        map.removeLayer(coverageLayers[key]);
+    }
+    coverageLayers = {};
 }

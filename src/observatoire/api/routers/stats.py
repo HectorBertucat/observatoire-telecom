@@ -6,21 +6,20 @@ import duckdb
 from fastapi import APIRouter, Depends, Query
 
 from observatoire.api.deps import get_db
-from observatoire.db.queries import get_department_stats, get_table_counts
+from observatoire.db.queries import get_raw_coverage_stats, get_table_counts
 
 router = APIRouter()
 
 DB = Annotated[duckdb.DuckDBPyConnection, Depends(get_db)]
 
 
-@router.get("/department/{department_code}")
-async def department_stats(
-    department_code: str,
+@router.get("/coverage")
+async def coverage_stats(
     db: DB,
     technology: str = Query("4G", description="Technologie réseau"),
 ):
-    """Retourne les statistiques de couverture par opérateur pour un département."""
-    return get_department_stats(db, department_code, technology)
+    """Retourne les stats de couverture par opérateur depuis les données brutes."""
+    return get_raw_coverage_stats(db, technology)
 
 
 @router.get("/tables")

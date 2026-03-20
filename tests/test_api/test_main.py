@@ -1,14 +1,30 @@
 """Tests pour l'API FastAPI."""
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
-from observatoire.api.main import app
+
+@pytest.fixture(autouse=True)
+def _use_temp_db(tmp_path):
+    """Force l'API à utiliser une DB temporaire pour les tests."""
+    os.environ["OBS_DB_PATH"] = str(tmp_path / "test.duckdb")
+    # Recharger le module config pour prendre en compte le changement
+    from observatoire import config
+
+    config.settings = config.Settings()
+    yield
+    os.environ.pop("OBS_DB_PATH", None)
+    config.settings = config.Settings()
 
 
 @pytest.fixture
 def client():
     """Client de test FastAPI."""
+    # Import après le changement de config
+    from observatoire.api.main import app
+
     with TestClient(app) as c:
         yield c
 
@@ -43,3 +59,19 @@ def test_stats_tables(client):
     assert response.status_code == 200
     data = response.json()
     assert "ref_operators" in data
+
+
+def test_stats_coverage(client):
+    """Vérifie que l'endpoint coverage stats retourne une liste."""
+    response = client.get("/api/v1/stats/coverage?technology=4G")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+def test_coverage_geojson(client):
+    """Vérifie que l'endpoint GeoJSON retourne un FeatureCollection."""
+    response = client.get("/api/v1/coverage/geojson?operator=OF&technology=4G")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["type"] == "FeatureCollection"
+    assert isinstance(data["features"], list)

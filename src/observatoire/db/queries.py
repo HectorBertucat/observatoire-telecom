@@ -39,31 +39,68 @@ def get_commune_coverage(
     return [dict(zip(columns, row, strict=True)) for row in result]
 
 
-def get_department_stats(
+def get_raw_coverage_stats(
     conn: duckdb.DuckDBPyConnection,
-    department_code: str,
     technology: str = "4G",
 ) -> list[dict]:
-    """Retourne les statistiques de couverture par opérateur pour un département."""
+    """Retourne les stats de couverture par opérateur depuis raw_coverage."""
     result = conn.execute(
         """
         SELECT
-            operator_code AS operator,
-            technology,
-            ROUND(AVG(coverage_pct), 1) AS avg_coverage,
-            SUM(antenna_count) AS total_antennas,
-            COUNT(DISTINCT commune_code) AS commune_count
-        FROM mart_coverage_by_commune
-        WHERE department_code = ?
-          AND technology = ?
-        GROUP BY operator_code, technology
-        ORDER BY avg_coverage DESC
+            rc.operator_code AS operator,
+            ro.name AS operator_name,
+            rc.technology,
+            COUNT(*) AS geometry_count,
+            rc.quarter
+        FROM raw_coverage rc
+        LEFT JOIN ref_operators ro ON rc.operator_code = ro.code
+        WHERE rc.technology = ?
+        GROUP BY rc.operator_code, ro.name, rc.technology, rc.quarter
+        ORDER BY rc.operator_code
         """,
-        [department_code, technology],
+        [technology],
     ).fetchall()
 
-    columns = ["operator", "technology", "avg_coverage", "total_antennas", "commune_count"]
+    columns = ["operator", "operator_name", "technology", "geometry_count", "quarter"]
     return [dict(zip(columns, row, strict=True)) for row in result]
+
+
+def get_coverage_geojson(
+    conn: duckdb.DuckDBPyConnection,
+    operator_code: str,
+    technology: str = "4G",
+) -> dict:
+    """Retourne les géométries de couverture en GeoJSON simplifié."""
+    result = conn.execute(
+        """
+        SELECT
+            ST_AsGeoJSON(ST_Simplify(geometry, 0.01)) AS geojson,
+            operator_code,
+            technology,
+            quarter
+        FROM raw_coverage
+        WHERE operator_code = ?
+          AND technology = ?
+        LIMIT 50
+        """,
+        [operator_code, technology],
+    ).fetchall()
+
+    features = []
+    for row in result:
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": __import__("json").loads(row[0]),
+                "properties": {
+                    "operator": row[1],
+                    "technology": row[2],
+                    "quarter": row[3],
+                },
+            }
+        )
+
+    return {"type": "FeatureCollection", "features": features}
 
 
 def get_table_counts(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:

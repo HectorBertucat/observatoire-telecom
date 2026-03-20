@@ -92,6 +92,18 @@ button:hover {
     background: #2c5282;
 }
 
+.btn-secondary {
+    background: var(--color-muted);
+}
+
+.btn-secondary:hover {
+    background: #4a5568;
+}
+
+.chart-box-full {
+    flex: 1;
+}
+
 main {
     padding: 1.5rem 2rem;
     max-width: 1400px;
