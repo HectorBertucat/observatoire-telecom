@@ -139,6 +139,63 @@ def get_antenna_list(
     return [dict(zip(columns, row, strict=True)) for row in result]
 
 
+def get_nearby_antennas(
+    conn: duckdb.DuckDBPyConnection,
+    latitude: float,
+    longitude: float,
+    radius_km: float = 2.0,
+    technology: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Retourne les antennes proches d'un point GPS.
+
+    Utilise une approximation haversine simplifiée (~111km/degré).
+    """
+    # Approximation : 1 degré ≈ 111 km
+    delta = radius_km / 111.0
+
+    conditions = [
+        "latitude BETWEEN ? AND ?",
+        "longitude BETWEEN ? AND ?",
+    ]
+    params: list[Any] = [
+        latitude - delta,
+        latitude + delta,
+        longitude - delta,
+        longitude + delta,
+    ]
+
+    if technology:
+        conditions.append("technology = ?")
+        params.append(technology)
+
+    params.append(limit)
+    where = " AND ".join(conditions)
+
+    result = conn.execute(
+        f"""
+        SELECT
+            id, operator, technology, latitude, longitude,
+            commune_code, department_code,
+            ROUND(111.0 * SQRT(
+                POWER(latitude - {latitude}, 2) +
+                POWER((longitude - {longitude}) * COS(RADIANS({latitude})), 2)
+            ), 2) AS distance_km
+        FROM raw_antenna_sites
+        WHERE {where}
+        ORDER BY distance_km
+        LIMIT ?
+        """,
+        params,
+    ).fetchall()
+
+    columns = [
+        "id", "operator", "technology", "latitude", "longitude",
+        "commune_code", "department_code", "distance_km",
+    ]
+    return [dict(zip(columns, row, strict=True)) for row in result]
+
+
 def get_coverage_geojson(operator_code: str, technology: str = "4G") -> dict[str, Any]:
     """Retourne le GeoJSON pré-simplifié depuis le fichier statique."""
     geojson_dir = settings.data_dir / "geojson"

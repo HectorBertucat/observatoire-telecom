@@ -10,6 +10,7 @@ from observatoire.db.queries import (
     get_antenna_list,
     get_antenna_stats,
     get_department_antenna_stats,
+    get_nearby_antennas,
     search_commune_antennas,
 )
 
@@ -43,6 +44,19 @@ async def commune_antennas(
 ) -> dict[str, Any]:
     """Résumé des antennes pour une commune (code INSEE)."""
     return search_commune_antennas(db, commune_code)
+
+
+@router.get("/nearby")
+async def nearby_antennas(
+    db: DB,
+    lat: float = Query(..., description="Latitude"),
+    lon: float = Query(..., description="Longitude"),
+    radius: float = Query(2.0, ge=0.1, le=50, description="Rayon en km"),
+    technology: str | None = Query(None, description="Technologie (2G, 3G, 4G, 5G)"),
+    limit: int = Query(50, ge=1, le=200),
+) -> list[dict[str, Any]]:
+    """Antennes proches d'un point GPS, triées par distance."""
+    return get_nearby_antennas(db, lat, lon, radius, technology, limit)
 
 
 @router.get("/")

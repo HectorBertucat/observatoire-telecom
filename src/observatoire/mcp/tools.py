@@ -136,6 +136,46 @@ def register_tools(mcp: FastMCP) -> None:
         return "\n".join(lines)
 
     @mcp.tool()
+    def find_nearby_antennas(
+        latitude: float,
+        longitude: float,
+        radius_km: float = 2.0,
+        technology: str = "4G",
+    ) -> str:
+        """Trouve les antennes proches d'un point GPS.
+
+        Utile pour savoir quels opérateurs couvrent un lieu précis.
+
+        Args:
+            latitude: Latitude du point (ex: 43.6047 pour Toulouse)
+            longitude: Longitude du point (ex: 1.4442 pour Toulouse)
+            radius_km: Rayon de recherche en kilomètres (défaut: 2km)
+            technology: Technologie réseau (2G, 3G, 4G, 5G)
+        """
+        from observatoire.db.queries import get_nearby_antennas
+
+        with db_session(read_only=True) as conn:
+            results = get_nearby_antennas(
+                conn, latitude, longitude, radius_km, technology, limit=20
+            )
+
+        if not results:
+            return f"Aucune antenne {technology} dans un rayon de {radius_km}km."
+
+        lines = [
+            f"Antennes {technology} dans un rayon de {radius_km}km "
+            f"de ({latitude:.4f}, {longitude:.4f}):\n"
+        ]
+        for r in results:
+            lines.append(
+                f"  {r['operator']} — {r['distance_km']}km "
+                f"(commune {r['commune_code']}, dept {r['department_code']})"
+            )
+        lines.append(f"\n  Total: {len(results)} antennes")
+
+        return "\n".join(lines)
+
+    @mcp.tool()
     def search_antennas(
         commune_code: str,
         technology: str = "4G",

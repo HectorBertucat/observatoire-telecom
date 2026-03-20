@@ -31,6 +31,11 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - Graphique stacked bars : sites d'antennes par opérateur × technologie
 - API antennes : endpoints /antennas/, /antennas/stats, /antennas/commune/{code}
 - Recherche par commune (code INSEE) : zoom + affichage antennes locales
+- API nearby : /antennas/nearby?lat=X&lon=Y pour trouver les antennes proches
+- API department : /antennas/department/{code} stats par département
+- MCP tool find_nearby_antennas : recherche géospatiale par coordonnées GPS
+- Agent E2E testé avec pydantic-ai TestModel (sans clé API)
+- `python -m observatoire` lance l'API directement
 - README complet avec guide de démarrage, API, architecture
 - Licence MIT
 - 5 nouveaux tests API antennes (26 tests total)
