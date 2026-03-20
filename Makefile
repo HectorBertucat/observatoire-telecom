@@ -1,4 +1,4 @@
-.PHONY: help ingest serve test lint format mcp clean
+.PHONY: help ingest serve test lint format mcp seed tiles clean
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -23,7 +23,13 @@ format: ## Formate le code automatiquement
 	uv run ruff check --fix src/ tests/
 
 mcp: ## Lance le serveur MCP
-	uv run python -m observatoire.mcp.server
+	uv run python -m observatoire.mcp
+
+seed: ## Génère des données de test (sans téléchargement)
+	uv run python scripts/seed_sample_data.py
+
+tiles: ## Régénère les vector tiles PMTiles
+	uv run python scripts/generate_tiles.py
 
 clean: ## Nettoie les fichiers temporaires
 	rm -rf data/raw/* data/processed/*

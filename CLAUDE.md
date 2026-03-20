@@ -45,8 +45,9 @@ en France, basé sur les données ouvertes ARCEP/ANFR. Side-project data enginee
 - `make lint` : vérifier le code (ruff check + format)
 - `make format` : formater le code automatiquement
 - `make mcp` : lancer le serveur MCP
-- `uv run python scripts/run_full_pipeline.py [operators...]` : pipeline d'ingestion
-- `uv run python scripts/generate_tiles.py` : régénérer les vector tiles PMTiles
+- `make seed` : générer des données de test (sans téléchargement)
+- `make tiles` : régénérer les vector tiles PMTiles
+- `uv run python scripts/run_full_pipeline.py [operators...]` : pipeline d'ingestion complète
 
 ## Pipeline de données
 1. Download : httpx async depuis data.arcep.fr → data/raw/
