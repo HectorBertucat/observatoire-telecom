@@ -4,6 +4,8 @@ import json
 
 import duckdb
 
+from observatoire.config import settings
+
 
 def get_commune_coverage(
     conn: duckdb.DuckDBPyConnection,
@@ -67,54 +69,33 @@ def get_raw_coverage_stats(
     return [dict(zip(columns, row, strict=True)) for row in result]
 
 
-def get_coverage_geojson(
-    conn: duckdb.DuckDBPyConnection,
-    operator_code: str,
-    technology: str = "4G",
-    limit: int = 10,
-) -> dict:
-    """Retourne les enveloppes de couverture en GeoJSON.
+def get_coverage_geojson(operator_code: str, technology: str = "4G") -> dict:
+    """Retourne le GeoJSON pré-simplifié depuis le fichier statique."""
+    geojson_dir = settings.data_dir / "geojson"
+    filename = f"coverage_{operator_code}_{technology}.geojson"
+    path = geojson_dir / filename
 
-    Les géométries ARCEP sont trop lourdes (~200k points chacune) pour
-    être servies en GeoJSON. On retourne les enveloppes (bounding boxes)
-    qui sont instantanées à calculer.
-    """
-    result = conn.execute(
-        """
-        SELECT
-            ST_AsGeoJSON(
-                ST_FlipCoordinates(
-                    ST_Transform(ST_Envelope(geometry), 'EPSG:2154', 'EPSG:4326')
-                )
-            ) AS geojson,
-            operator_code,
-            technology,
-            quarter,
-            ST_NPoints(geometry) AS npoints
-        FROM raw_coverage
-        WHERE operator_code = $1
-          AND technology = $2
-        LIMIT $3
-        """,
-        [operator_code, technology, limit],
-    ).fetchall()
+    if not path.exists():
+        return {"type": "FeatureCollection", "features": []}
 
-    features = []
-    for row in result:
-        features.append(
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def list_available_geojson() -> list[dict]:
+    """Liste les fichiers GeoJSON disponibles avec leur taille."""
+    geojson_dir = settings.data_dir / "geojson"
+    if not geojson_dir.exists():
+        return []
+
+    files = []
+    for path in sorted(geojson_dir.glob("*.geojson")):
+        files.append(
             {
-                "type": "Feature",
-                "geometry": json.loads(row[0]),
-                "properties": {
-                    "operator": row[1],
-                    "technology": row[2],
-                    "quarter": row[3],
-                    "detail_points": row[4],
-                },
+                "filename": path.name,
+                "size_kb": round(path.stat().st_size / 1024),
             }
         )
-
-    return {"type": "FeatureCollection", "features": features}
+    return files
 
 
 def get_table_counts(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:

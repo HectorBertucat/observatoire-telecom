@@ -1,43 +1,87 @@
-"""Pré-calcul des géométries simplifiées pour l'affichage."""
+"""Pré-calcul des géométries simplifiées pour l'affichage web."""
 
+import json
 import logging
+from pathlib import Path
 
 import duckdb
 
+from observatoire.config import settings
+
 logger = logging.getLogger(__name__)
 
+# Tolérance de simplification en mètres (données en Lambert-93 / EPSG:2154)
+SIMPLIFY_TOLERANCE = 5000  # 5 km — bon compromis taille/fidélité
 
-def create_simplified_coverage(conn: duckdb.DuckDBPyConnection) -> int:
-    """Crée une table de couverture avec géométries simplifiées pour la carte.
 
-    Les géométries ARCEP brutes ont ~200k points chacune.
-    On les simplifie agressivement (tolérance 0.01°, ~1km) pour le rendu web.
+def export_operator_geojson(
+    conn: duckdb.DuckDBPyConnection,
+    operator_code: str,
+    technology: str = "4G",
+    dest_dir: Path | None = None,
+) -> Path:
+    """Exporte les géométries simplifiées d'un opérateur en GeoJSON statique.
+
+    Pipeline : Lambert-93 → Simplify(5km) → WGS84 → GeoJSON
+    Résultat : ~60-120 points par géométrie au lieu de ~200k.
     """
-    logger.info("Création de stg_coverage_simplified...")
+    dest_dir = dest_dir or settings.data_dir / "geojson"
+    dest_dir.mkdir(parents=True, exist_ok=True)
 
-    conn.execute("DROP TABLE IF EXISTS stg_coverage_simplified")
-    conn.execute("""
-        CREATE TABLE stg_coverage_simplified AS
+    result = conn.execute(
+        """
         SELECT
-            row_number() OVER () AS id,
+            ST_AsGeoJSON(
+                ST_FlipCoordinates(
+                    ST_Transform(
+                        ST_Simplify(geometry, $3),
+                        'EPSG:2154', 'EPSG:4326'
+                    )
+                )
+            ) AS geojson,
             operator_code,
             technology,
-            quarter,
-            ST_Simplify(geometry, 0.1) AS geometry,
-            ST_NPoints(ST_Simplify(geometry, 0.1)) AS npoints
+            quarter
         FROM raw_coverage
-    """)
+        WHERE operator_code = $1
+          AND technology = $2
+        """,
+        [operator_code, technology, SIMPLIFY_TOLERANCE],
+    ).fetchall()
 
-    count: int = conn.execute(
-        "SELECT count(*) FROM stg_coverage_simplified"
-    ).fetchone()[0]  # type: ignore[index]
+    features = []
+    for row in result:
+        geom = json.loads(row[0])
+        # Filtrer les géométries vides après simplification
+        if geom.get("coordinates"):
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": geom,
+                    "properties": {
+                        "operator": row[1],
+                        "technology": row[2],
+                        "quarter": row[3],
+                    },
+                }
+            )
 
-    total_points: int = conn.execute(
-        "SELECT SUM(npoints) FROM stg_coverage_simplified"
-    ).fetchone()[0]  # type: ignore[index]
+    geojson = {"type": "FeatureCollection", "features": features}
 
-    logger.info(
-        f"stg_coverage_simplified: {count} géométries, "
-        f"{total_points:,} points total (vs ~230M bruts)"
-    )
-    return count
+    filename = f"coverage_{operator_code}_{technology}.geojson"
+    dest = dest_dir / filename
+    dest.write_text(json.dumps(geojson), encoding="utf-8")
+
+    size_kb = dest.stat().st_size / 1024
+    logger.info(f"{filename}: {len(features)} features, {size_kb:.0f} KB")
+    return dest
+
+
+def export_all_geojson(conn: duckdb.DuckDBPyConnection, technology: str = "4G") -> list[Path]:
+    """Exporte les GeoJSON simplifiés pour tous les opérateurs."""
+    operators = [r[0] for r in conn.execute("SELECT code FROM ref_operators").fetchall()]
+    paths = []
+    for op in operators:
+        path = export_operator_geojson(conn, op, technology)
+        paths.append(path)
+    return paths

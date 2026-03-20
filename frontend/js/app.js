@@ -3,23 +3,23 @@
 const API_BASE = "/api/v1";
 
 /**
- * Charge les données au clic sur Rechercher.
+ * Charge les données au clic sur Afficher.
  */
 async function loadData() {
     const operator = document.getElementById("operator-select").value;
     const technology = document.getElementById("tech-select").value;
 
-    if (!operator) {
-        alert("Veuillez sélectionner un opérateur.");
-        return;
-    }
+    if (!operator) return;
 
-    // Charger la couverture sur la carte
+    setLoading(true);
     clearCoverageLayers();
-    await loadCoverageLayer(operator, technology);
 
-    // Charger les stats globales
+    await loadCoverageLayer(operator, technology);
+    // Recentrer sur la France après chargement
+    map.setView([46.603, 2.888], 6);
+
     await loadStats(technology);
+    setLoading(false);
 }
 
 /**
@@ -27,14 +27,31 @@ async function loadData() {
  */
 async function loadAllOperators() {
     const technology = document.getElementById("tech-select").value;
+
+    setLoading(true);
     clearCoverageLayers();
 
     const operators = ["OF", "BYT", "FREE", "SFR"];
-    for (const op of operators) {
-        await loadCoverageLayer(op, technology);
-    }
+    await Promise.all(operators.map((op) => loadCoverageLayer(op, technology)));
 
+    map.setView([46.603, 2.888], 6);
     await loadStats(technology);
+    setLoading(false);
+}
+
+/**
+ * Affiche/masque l'indicateur de chargement.
+ */
+function setLoading(loading) {
+    const buttons = document.querySelectorAll("nav button");
+    buttons.forEach((btn) => {
+        btn.disabled = loading;
+        if (loading) {
+            btn.style.opacity = "0.6";
+        } else {
+            btn.style.opacity = "1";
+        }
+    });
 }
 
 /**
@@ -100,12 +117,10 @@ function updateStatsGrid(counts) {
 // Chargement initial
 document.addEventListener("DOMContentLoaded", async () => {
     try {
-        // Stats tables
         const tablesRes = await fetch(`${API_BASE}/stats/tables`);
         const counts = await tablesRes.json();
         updateStatsGrid(counts);
 
-        // Stats couverture
         await loadStats("4G");
     } catch (error) {
         console.error("Erreur chargement initial:", error);

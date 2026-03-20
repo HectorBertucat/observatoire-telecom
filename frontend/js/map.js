@@ -14,10 +14,17 @@ const MAP_OPERATOR_COLORS = {
     FREE: "#CD1719",
 };
 
+const MAP_OPERATOR_NAMES = {
+    OF: "Orange",
+    SFR: "SFR",
+    BYT: "Bouygues",
+    FREE: "Free",
+};
+
 let coverageLayers = {};
 
 /**
- * Charge et affiche les enveloppes de couverture pour un opérateur.
+ * Charge et affiche les polygones de couverture pour un opérateur.
  */
 async function loadCoverageLayer(operator, technology) {
     if (coverageLayers[operator]) {
@@ -26,35 +33,29 @@ async function loadCoverageLayer(operator, technology) {
 
     try {
         const response = await fetch(
-            `/api/v1/coverage/geojson?operator=${operator}&technology=${technology}&limit=50`
+            `/api/v1/coverage/geojson?operator=${operator}&technology=${technology}`
         );
         const geojson = await response.json();
 
         if (geojson.features.length === 0) return;
 
         const color = MAP_OPERATOR_COLORS[operator] || "#999";
+        const name = MAP_OPERATOR_NAMES[operator] || operator;
 
         coverageLayers[operator] = L.geoJSON(geojson, {
             style: {
                 color: color,
-                weight: 1.5,
+                weight: 0.8,
                 fillColor: color,
-                fillOpacity: 0.25,
+                fillOpacity: 0.35,
             },
             onEachFeature: function (feature, layer) {
                 const props = feature.properties;
-                const pts = props.detail_points
-                    ? props.detail_points.toLocaleString("fr-FR")
-                    : "?";
                 layer.bindPopup(
-                    `<b>${props.operator}</b> (${props.technology})<br>` +
-                        `Trimestre: ${props.quarter}<br>` +
-                        `Détail: ${pts} points`
+                    `<b>${name}</b><br>${props.technology} — ${props.quarter}`
                 );
             },
         }).addTo(map);
-
-        map.fitBounds(coverageLayers[operator].getBounds(), { padding: [20, 20] });
     } catch (error) {
         console.error(`Erreur chargement couverture ${operator}:`, error);
     }
