@@ -5,6 +5,14 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [Unreleased]
+
+### Added
+- 2G ARCEP coverage (2024_T4, 4 opérateurs, 1147 géométries)
+- Référentiel communes INSEE (34 955 communes avec noms)
+- mart_coverage_by_commune peuplé (197k lignes, antennes par commune)
+- Tuiles multi-technologie (2G + 3G + 4G, 2724 features)
+
 ## [0.1.0] - 2026-03-21
 
 ### Added

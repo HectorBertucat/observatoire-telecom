@@ -58,7 +58,8 @@ en France, basé sur les données ouvertes ARCEP/ANFR. Side-project data enginee
 
 ## Données chargées (état actuel)
 - 4 opérateurs : Orange (OF), Bouygues (BYT), Free (FREE), SFR (SFR)
-- **raw_coverage** : 1148 géométries MULTIPOLYGON (4G, trimestre 2025_T3)
+- **raw_coverage** : 2724 géométries MULTIPOLYGON (2G+3G+4G)
+  - 4G : 2025_T3, 3G+2G : 2024_T4
   - Codes fichiers ARCEP : BOUY, FREE, OF, SFR0 (≠ codes DB : BYT, FREE, OF, SFR)
   - Coordonnées en Lambert-93 (EPSG:2154)
 - **raw_antenna_sites** : 354k sites d'antennes ANFR (2G/3G/4G/5G)
@@ -67,7 +68,9 @@ en France, basé sur les données ouvertes ARCEP/ANFR. Side-project data enginee
   - Coordonnées en WGS84 (converties depuis DMS)
   - commune_code = COM_CD_INSEE (code INSEE), department_code = 2 premiers chiffres
   - Systèmes : GSM%=2G, UMTS%=3G, LTE%=4G, 5G NR%=5G
-- **PMTiles** : coverage.pmtiles (141 MB, z4-z12) + antennas.pmtiles (19 MB, z7-z14)
+- **ref_communes** : 34 955 communes avec codes INSEE et noms
+- **mart_coverage_by_commune** : 197k lignes (antennes par commune/opérateur/techno)
+- **PMTiles** : coverage.pmtiles (71 MB, z4-z12) + antennas.pmtiles (18 MB, z7-z14)
 - **5 MCP tools** : get_antenna_count, compare_operators, get_coverage_summary,
   search_antennas, find_nearby_antennas
 
