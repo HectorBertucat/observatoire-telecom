@@ -1,13 +1,13 @@
-/* Carte MapLibre GL JS avec vector tiles PMTiles */
+/* Carte MapLibre GL JS — dark theme + CartoDB Positron */
 
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol("pmtiles", protocol.tile);
 
 const OPERATORS = {
-    OF:   { name: "Orange",          color: "#FF6600" },
-    BYT:  { name: "Bouygues Telecom", color: "#003DA5" },
-    FREE: { name: "Free Mobile",     color: "#CD1719" },
-    SFR:  { name: "SFR",            color: "#E4002B" },
+    OF:   { name: "Orange",           color: "#f97316" },
+    BYT:  { name: "Bouygues Telecom", color: "#3b82f6" },
+    FREE: { name: "Free Mobile",      color: "#ec4899" },
+    SFR:  { name: "SFR",              color: "#ef4444" },
 };
 
 const map = new maplibregl.Map({
@@ -15,11 +15,14 @@ const map = new maplibregl.Map({
     style: {
         version: 8,
         sources: {
-            osm: {
+            basemap: {
                 type: "raster",
-                tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                tiles: [
+                    "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+                    "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+                ],
                 tileSize: 256,
-                attribution: "&copy; OpenStreetMap contributors",
+                attribution: "&copy; CARTO &copy; OpenStreetMap",
             },
             coverage: {
                 type: "vector",
@@ -32,13 +35,12 @@ const map = new maplibregl.Map({
         },
         layers: [
             {
-                id: "osm-tiles",
+                id: "basemap",
                 type: "raster",
-                source: "osm",
+                source: "basemap",
                 minzoom: 0,
                 maxzoom: 19,
             },
-            // Couverture : fill + line par opérateur
             ...Object.entries(OPERATORS).flatMap(([op, info]) => [
                 {
                     id: `coverage-fill-${op}`,
@@ -48,7 +50,7 @@ const map = new maplibregl.Map({
                     filter: ["==", ["get", "operator"], op],
                     paint: {
                         "fill-color": info.color,
-                        "fill-opacity": 0.35,
+                        "fill-opacity": 0.3,
                     },
                 },
                 {
@@ -59,12 +61,11 @@ const map = new maplibregl.Map({
                     filter: ["==", ["get", "operator"], op],
                     paint: {
                         "line-color": info.color,
-                        "line-width": 0.5,
-                        "line-opacity": 0.6,
+                        "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.3, 10, 1],
+                        "line-opacity": 0.5,
                     },
                 },
             ]),
-            // Antennes : cercles par opérateur (visibles à partir de z8)
             ...Object.entries(OPERATORS).map(([op, info]) => ({
                 id: `antennas-${op}`,
                 type: "circle",
@@ -73,21 +74,10 @@ const map = new maplibregl.Map({
                 filter: ["==", ["get", "operator"], op],
                 minzoom: 8,
                 paint: {
-                    "circle-radius": [
-                        "interpolate", ["linear"], ["zoom"],
-                        8, 2,
-                        10, 3,
-                        12, 5,
-                        14, 7,
-                    ],
+                    "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 1.5, 11, 3, 14, 6],
                     "circle-color": info.color,
-                    "circle-stroke-color": "#fff",
-                    "circle-stroke-width": [
-                        "interpolate", ["linear"], ["zoom"],
-                        8, 0,
-                        10, 0.5,
-                        12, 1,
-                    ],
+                    "circle-stroke-color": "rgba(255,255,255,0.6)",
+                    "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 0, 11, 0.5, 14, 1],
                     "circle-opacity": 0.8,
                 },
             })),
@@ -98,31 +88,26 @@ const map = new maplibregl.Map({
     maxZoom: 15,
 });
 
-// Navigation controls
-map.addControl(new maplibregl.NavigationControl(), "top-right");
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
-// Popup au clic — couverture
+// Popup click — antennas first, then coverage
 map.on("click", (e) => {
-    // Chercher antennes d'abord (plus précis)
     const antennaLayers = Object.keys(OPERATORS).map((op) => `antennas-${op}`);
     const antennaFeats = map.queryRenderedFeatures(e.point, { layers: antennaLayers });
 
     if (antennaFeats.length > 0) {
-        const props = antennaFeats[0].properties;
-        const info = OPERATORS[props.operator] || { name: props.operator, color: "#999" };
-        new maplibregl.Popup({ maxWidth: "250px" })
+        const p = antennaFeats[0].properties;
+        const info = OPERATORS[p.operator] || { name: p.operator, color: "#999" };
+        new maplibregl.Popup({ maxWidth: "220px", className: "dark-popup" })
             .setLngLat(e.lngLat)
             .setHTML(
-                `<div style="font-size:13px">` +
-                `<b>${info.name}</b> — Antenne ${props.technology}<br>` +
-                `<span style="color:#666">Commune: ${props.commune || "?"}</span>` +
-                `</div>`
+                `<b style="color:${info.color}">${info.name}</b><br>` +
+                `${p.technology} — ${p.commune || ""}`
             )
             .addTo(map);
         return;
     }
 
-    // Sinon couverture
     const coverageLayers = Object.keys(OPERATORS).map((op) => `coverage-fill-${op}`);
     const coverageFeats = map.queryRenderedFeatures(e.point, { layers: coverageLayers });
     if (coverageFeats.length === 0) return;
@@ -130,39 +115,60 @@ map.on("click", (e) => {
     const ops = [...new Set(coverageFeats.map((f) => f.properties.operator))];
     const lines = ops.map((op) => {
         const info = OPERATORS[op];
-        const dot = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${info.color};margin-right:4px"></span>`;
-        return `${dot}<b>${info.name}</b>`;
+        return `<span style="color:${info.color}">&#9679;</span> ${info.name}`;
     });
 
-    const quarter = coverageFeats[0].properties.quarter || "";
-    const tech = coverageFeats[0].properties.technology || "";
-
-    new maplibregl.Popup({ maxWidth: "250px" })
+    new maplibregl.Popup({ maxWidth: "220px", className: "dark-popup" })
         .setLngLat(e.lngLat)
         .setHTML(
-            `<div style="font-size:13px">` +
-            `<div style="margin-bottom:4px;color:#666">${tech} — ${quarter}</div>` +
-            lines.join("<br>") +
-            `</div>`
+            `<div style="font-size:12px">` +
+            `<div style="color:#94a3b8;margin-bottom:4px">${coverageFeats[0].properties.technology || "4G"}</div>` +
+            lines.join("<br>") + `</div>`
         )
         .addTo(map);
 });
 
-// Curseur pointer
+// Right-click → nearby antennas
+map.on("contextmenu", async (e) => {
+    e.preventDefault();
+    const { lng, lat } = e.lngLat;
+    try {
+        const res = await fetch(`/api/v1/antennas/nearby?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&radius=2&limit=10`);
+        const data = await res.json();
+        if (data.length === 0) {
+            new maplibregl.Popup({ maxWidth: "250px", className: "dark-popup" })
+                .setLngLat(e.lngLat)
+                .setHTML(`<div style="font-size:12px;color:#94a3b8">Aucune antenne dans 2km</div>`)
+                .addTo(map);
+            return;
+        }
+        const byOp = {};
+        data.forEach((a) => { byOp[a.operator] = (byOp[a.operator] || 0) + 1; });
+        const opLines = Object.entries(byOp).map(([op, count]) => {
+            const info = OPERATORS[op] || { name: op, color: "#999" };
+            return `<span style="color:${info.color}">&#9679;</span> ${info.name}: ${count}`;
+        }).join("<br>");
+        new maplibregl.Popup({ maxWidth: "250px", className: "dark-popup" })
+            .setLngLat(e.lngLat)
+            .setHTML(
+                `<div style="font-size:12px">` +
+                `<b>${data.length} antennes</b> dans 2km<br>` +
+                `<span style="color:#64748b">Plus proche: ${data[0].distance_km}km</span>` +
+                `<hr style="margin:4px 0;border:none;border-top:1px solid rgba(255,255,255,0.1)">` +
+                opLines + `</div>`
+            )
+            .addTo(map);
+    } catch (err) { console.error("Nearby error:", err); }
+});
+
+// Cursor pointer
 for (const op of Object.keys(OPERATORS)) {
-    for (const layerPrefix of ["coverage-fill-", "antennas-"]) {
-        map.on("mouseenter", `${layerPrefix}${op}`, () => {
-            map.getCanvas().style.cursor = "pointer";
-        });
-        map.on("mouseleave", `${layerPrefix}${op}`, () => {
-            map.getCanvas().style.cursor = "";
-        });
+    for (const prefix of ["coverage-fill-", "antennas-"]) {
+        map.on("mouseenter", `${prefix}${op}`, () => { map.getCanvas().style.cursor = "pointer"; });
+        map.on("mouseleave", `${prefix}${op}`, () => { map.getCanvas().style.cursor = ""; });
     }
 }
 
-/**
- * Filtre les couches par opérateur.
- */
 function filterByOperator(operator) {
     for (const op of Object.keys(OPERATORS)) {
         const visible = operator === "all" || operator === op;
@@ -171,13 +177,23 @@ function filterByOperator(operator) {
         map.setLayoutProperty(`coverage-line-${op}`, "visibility", vis);
         map.setLayoutProperty(`antennas-${op}`, "visibility", vis);
     }
-    updateLegend(operator);
 }
 
-/**
- * Construit la légende de la carte.
- */
-function buildLegend() {
+function toggleOperator(op, visible) {
+    const vis = visible ? "visible" : "none";
+    map.setLayoutProperty(`coverage-fill-${op}`, "visibility", vis);
+    map.setLayoutProperty(`coverage-line-${op}`, "visibility", vis);
+    map.setLayoutProperty(`antennas-${op}`, "visibility", vis);
+}
+
+// Zoom indicator
+map.on("zoomend", () => {
+    const el = document.getElementById("zoom-indicator");
+    if (el) el.textContent = `z${map.getZoom().toFixed(1)}`;
+});
+
+// Build legend
+map.on("load", () => {
     const container = document.getElementById("map-legend");
     if (!container) return;
 
@@ -185,11 +201,10 @@ function buildLegend() {
         const item = document.createElement("label");
         item.className = "legend-item";
 
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.checked = true;
-        checkbox.dataset.operator = op;
-        checkbox.addEventListener("change", () => toggleOperator(op, checkbox.checked));
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = true;
+        cb.addEventListener("change", () => toggleOperator(op, cb.checked));
 
         const swatch = document.createElement("span");
         swatch.className = "legend-swatch";
@@ -199,129 +214,9 @@ function buildLegend() {
         label.className = "legend-label";
         label.textContent = info.name;
 
-        item.appendChild(checkbox);
+        item.appendChild(cb);
         item.appendChild(swatch);
         item.appendChild(label);
         container.appendChild(item);
-    }
-
-    // Toggle antennes
-    const sep = document.createElement("hr");
-    sep.style.margin = "4px 0";
-    sep.style.border = "none";
-    sep.style.borderTop = "1px solid #e2e8f0";
-    container.appendChild(sep);
-
-    const antennaItem = document.createElement("label");
-    antennaItem.className = "legend-item";
-
-    const antennaCb = document.createElement("input");
-    antennaCb.type = "checkbox";
-    antennaCb.checked = true;
-    antennaCb.addEventListener("change", () => {
-        const vis = antennaCb.checked ? "visible" : "none";
-        for (const op of Object.keys(OPERATORS)) {
-            map.setLayoutProperty(`antennas-${op}`, "visibility", vis);
-        }
-    });
-
-    const antennaSwatch = document.createElement("span");
-    antennaSwatch.className = "legend-swatch";
-    antennaSwatch.style.background = "radial-gradient(circle, #666 40%, transparent 40%)";
-    antennaSwatch.style.border = "1px solid #999";
-
-    const antennaLabel = document.createElement("span");
-    antennaLabel.className = "legend-label";
-    antennaLabel.textContent = "Antennes (z8+)";
-
-    antennaItem.appendChild(antennaCb);
-    antennaItem.appendChild(antennaSwatch);
-    antennaItem.appendChild(antennaLabel);
-    container.appendChild(antennaItem);
-}
-
-/**
- * Toggle la visibilité d'un opérateur via la légende.
- */
-function toggleOperator(op, visible) {
-    const vis = visible ? "visible" : "none";
-    map.setLayoutProperty(`coverage-fill-${op}`, "visibility", vis);
-    map.setLayoutProperty(`coverage-line-${op}`, "visibility", vis);
-    map.setLayoutProperty(`antennas-${op}`, "visibility", vis);
-}
-
-/**
- * Synchronise la légende avec le filtre du select.
- */
-function updateLegend(operator) {
-    const checkboxes = document.querySelectorAll("#map-legend input[type=checkbox]");
-    checkboxes.forEach((cb) => {
-        if (cb.dataset.operator) {
-            cb.checked = operator === "all" || cb.dataset.operator === operator;
-        }
-    });
-}
-
-// Clic droit → recherche antennes proches
-map.on("contextmenu", async (e) => {
-    e.preventDefault();
-    const { lng, lat } = e.lngLat;
-
-    try {
-        const res = await fetch(
-            `/api/v1/antennas/nearby?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&radius=2&limit=10`
-        );
-        const data = await res.json();
-
-        if (data.length === 0) {
-            new maplibregl.Popup({ maxWidth: "280px" })
-                .setLngLat(e.lngLat)
-                .setHTML(`<div style="font-size:13px">Aucune antenne dans un rayon de 2km</div>`)
-                .addTo(map);
-            return;
-        }
-
-        // Compter par opérateur
-        const byOp = {};
-        data.forEach((a) => {
-            const key = a.operator;
-            byOp[key] = (byOp[key] || 0) + 1;
-        });
-
-        const opLines = Object.entries(byOp)
-            .map(([op, count]) => {
-                const info = OPERATORS[op] || { name: op, color: "#999" };
-                const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${info.color};margin-right:4px"></span>`;
-                return `${dot}${info.name}: ${count}`;
-            })
-            .join("<br>");
-
-        const nearest = data[0];
-        new maplibregl.Popup({ maxWidth: "280px" })
-            .setLngLat(e.lngLat)
-            .setHTML(
-                `<div style="font-size:13px">` +
-                `<b>${data.length} antennes</b> dans 2km<br>` +
-                `<span style="color:#666">Plus proche: ${nearest.operator} ${nearest.technology} (${nearest.distance_km}km)</span>` +
-                `<hr style="margin:4px 0;border:none;border-top:1px solid #eee">` +
-                opLines +
-                `</div>`
-            )
-            .addTo(map);
-    } catch (err) {
-        console.error("Erreur nearby:", err);
-    }
-});
-
-// Construire la légende + indicateur de zoom
-map.on("load", () => {
-    buildLegend();
-});
-
-map.on("zoomend", () => {
-    const indicator = document.getElementById("zoom-indicator");
-    if (indicator) {
-        const z = map.getZoom().toFixed(1);
-        indicator.textContent = `z${z}`;
     }
 });

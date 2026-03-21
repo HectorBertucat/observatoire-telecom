@@ -3,85 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Observatoire Télécom France</title>
+    <title>Observatoire Telecom France</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
 </head>
 <body>
     <header>
-        <h1>Observatoire Télécom France</h1>
-        <p class="subtitle">Couverture et qualité des réseaux mobiles</p>
+        <div>
+            <h1>Observatoire Telecom France</h1>
+            <span class="header-subtitle">Couverture et qualite des reseaux mobiles</span>
+        </div>
+        <span class="header-badge">v0.1.0</span>
     </header>
 
-    <nav class="controls">
-        <div class="control-group">
-            <label for="operator-select">Opérateur</label>
-            <select id="operator-select">
-                <option value="all" selected>Tous</option>
-                <option value="OF">Orange</option>
-                <option value="BYT">Bouygues Telecom</option>
-                <option value="FREE">Free Mobile</option>
-                <option value="SFR">SFR</option>
-            </select>
-        </div>
-        <div class="control-group">
-            <label for="tech-select">Technologie</label>
-            <select id="tech-select">
-                <option value="4G" selected>4G</option>
-            </select>
-        </div>
-        <button onclick="applyFilter()">Afficher</button>
-        <button onclick="resetView()" class="btn-secondary">France</button>
-        <div class="control-group">
-            <label for="dept-select">Département</label>
-            <select id="dept-select" onchange="selectDepartment()">
-                <option value="">-- National --</option>
-            </select>
-        </div>
-        <div class="control-group">
-            <label for="commune-input">Commune (INSEE)</label>
-            <div style="display:flex;gap:4px">
-                <input type="text" id="commune-input" placeholder="ex: 31555"
-                    maxlength="5" style="width:90px;padding:0.5rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.9rem">
-                <button onclick="searchCommune()" class="btn-secondary">Go</button>
+    <div class="app-layout">
+        <!-- Side Panel -->
+        <aside class="side-panel">
+            <!-- Operators -->
+            <div class="panel-section">
+                <div class="panel-section-title">Operateurs</div>
+                <div id="operator-toggles"></div>
             </div>
-        </div>
-        <div class="control-group">
-            <label>&nbsp;</label>
-            <div>
-                <button onclick="exportCSV()" class="btn-secondary" title="Exporter les antennes en CSV">CSV</button>
-            </div>
-        </div>
-    </nav>
 
-    <main>
-        <div class="dashboard">
-            <section class="map-container">
-                <h2>Carte de couverture</h2>
-                <div id="map">
-                    <div id="zoom-indicator" class="zoom-indicator">z5.5</div>
-                    <div id="map-legend" class="map-legend"></div>
+            <hr class="panel-divider">
+
+            <!-- Department -->
+            <div class="panel-section">
+                <div class="panel-section-title">Departement</div>
+                <select id="dept-select" class="panel-select" onchange="selectDepartment()">
+                    <option value="">National</option>
+                </select>
+            </div>
+
+            <!-- Commune -->
+            <div class="panel-section">
+                <div class="panel-section-title">Commune (code INSEE)</div>
+                <div style="display:flex;gap:6px">
+                    <input type="text" id="commune-input" class="panel-input"
+                        placeholder="ex: 31555" maxlength="5" style="flex:1">
+                    <button onclick="searchCommune()" class="btn btn-ghost btn-sm">Go</button>
                 </div>
-            </section>
+            </div>
 
-            <section class="charts-container">
-                <div class="chart-box chart-box-full">
-                    <h2>Sites d'antennes par opérateur</h2>
+            <hr class="panel-divider">
+
+            <!-- Quick stats -->
+            <div class="panel-section">
+                <div class="panel-section-title">Donnees</div>
+                <div id="panel-stats"></div>
+            </div>
+
+            <hr class="panel-divider">
+
+            <!-- Actions -->
+            <div class="panel-section">
+                <div class="panel-section-title">Actions</div>
+                <div class="btn-row">
+                    <button onclick="resetView()" class="btn btn-ghost btn-sm" style="flex:1">France</button>
+                    <button onclick="exportCSV()" class="btn btn-ghost btn-sm" style="flex:1">CSV</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <div class="main-content">
+            <div id="map">
+                <div id="zoom-indicator" class="zoom-indicator">z5.5</div>
+                <div id="map-legend" class="map-legend"></div>
+            </div>
+
+            <div class="bottom-panel">
+                <div class="chart-card">
+                    <div class="chart-title">Sites d'antennes par operateur</div>
                     <canvas id="antennas-chart"></canvas>
                 </div>
-            </section>
-        </div>
-
-        <section class="stats-section">
-            <h2>Statistiques de la base</h2>
-            <div id="stats-grid" class="stats-grid">
-                <p class="placeholder">Chargement...</p>
+                <div class="chart-card">
+                    <div class="chart-title">Repartition par technologie</div>
+                    <canvas id="tech-chart"></canvas>
+                </div>
             </div>
-        </section>
-    </main>
+        </div>
+    </div>
 
     <footer>
-        <p>Données : ARCEP / ANFR — Licence Ouverte | Clic droit sur la carte = antennes proches</p>
+        Donnees ARCEP / ANFR — Licence Ouverte | Clic droit = antennes proches
     </footer>
 
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>

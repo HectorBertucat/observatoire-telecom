@@ -1,112 +1,152 @@
-/* Logique principale du dashboard */
+/* App logic — dark dashboard */
 
 const API_BASE = "/api/v1";
 
-/**
- * Applique le filtre opérateur sur la carte.
- */
-function applyFilter() {
-    const operator = document.getElementById("operator-select").value;
-    filterByOperator(operator);
-}
+const APP_OPERATORS = {
+    OF: { name: "Orange", color: "#f97316" },
+    BYT: { name: "Bouygues Telecom", color: "#3b82f6" },
+    FREE: { name: "Free Mobile", color: "#ec4899" },
+    SFR: { name: "SFR", color: "#ef4444" },
+};
 
-/**
- * Recentre la vue sur la France métropolitaine.
- */
-function resetView() {
-    map.flyTo({ center: [2.888, 46.603], zoom: 5.5, duration: 1 });
-}
+/* === INIT === */
+document.addEventListener("DOMContentLoaded", async () => {
+    buildOperatorToggles();
+    await Promise.all([loadDepartments(), loadStats()]);
 
-/**
- * Crée une carte de statistique via DOM API.
- */
-function createStatCard(label, value, subtitle) {
-    const card = document.createElement("div");
-    card.className = "stat-card";
+    const input = document.getElementById("commune-input");
+    if (input) input.addEventListener("keypress", (e) => { if (e.key === "Enter") searchCommune(); });
+});
 
-    const valueEl = document.createElement("div");
-    valueEl.className = "value";
-    valueEl.textContent = typeof value === "number" ? value.toLocaleString("fr-FR") : value;
+/* === OPERATOR TOGGLES === */
+function buildOperatorToggles() {
+    const container = document.getElementById("operator-toggles");
+    if (!container) return;
 
-    const labelEl = document.createElement("div");
-    labelEl.className = "label";
-    labelEl.textContent = label;
+    for (const [op, info] of Object.entries(APP_OPERATORS)) {
+        const label = document.createElement("label");
+        label.className = "operator-toggle";
 
-    card.appendChild(valueEl);
-    card.appendChild(labelEl);
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = true;
+        cb.addEventListener("change", () => toggleOperator(op, cb.checked));
 
-    if (subtitle) {
-        const subEl = document.createElement("div");
-        subEl.className = "label";
-        subEl.style.fontSize = "0.7rem";
-        subEl.style.marginTop = "2px";
-        subEl.textContent = subtitle;
-        card.appendChild(subEl);
+        const dot = document.createElement("span");
+        dot.className = "operator-dot";
+        dot.style.backgroundColor = info.color;
+
+        const name = document.createElement("span");
+        name.className = "operator-name";
+        name.textContent = info.name;
+
+        const count = document.createElement("span");
+        count.className = "operator-count";
+        count.id = `op-count-${op}`;
+
+        label.appendChild(cb);
+        label.appendChild(dot);
+        label.appendChild(name);
+        label.appendChild(count);
+        container.appendChild(label);
     }
-
-    return card;
 }
 
-/**
- * Met à jour la grille de statistiques avec des données enrichies.
- */
-async function updateStats() {
-    const grid = document.getElementById("stats-grid");
-    while (grid.firstChild) grid.removeChild(grid.firstChild);
-
+/* === STATS === */
+async function loadStats(deptCode) {
     try {
-        // Charger stats tables + antennes en parallèle
-        const [tablesRes, antennasRes] = await Promise.all([
-            fetch(`${API_BASE}/stats/tables`),
-            fetch(`${API_BASE}/stats/antennas`),
-        ]);
+        const url = deptCode
+            ? `${API_BASE}/antennas/department/${deptCode}`
+            : `${API_BASE}/stats/antennas`;
+        const response = await fetch(url);
+        const data = await response.json();
 
-        const tables = await tablesRes.json();
-        const antennas = await antennasRes.json();
-
-        // Calculs
-        const totalAntennas = antennas.reduce((sum, a) => sum + a.site_count, 0);
-        const total4G = antennas
-            .filter((a) => a.technology === "4G")
-            .reduce((sum, a) => sum + a.site_count, 0);
-        const total5G = antennas
-            .filter((a) => a.technology === "5G")
-            .reduce((sum, a) => sum + a.site_count, 0);
-        const coveragePolygons = tables["raw_coverage"] || 0;
-        const operators = new Set(antennas.map((a) => a.operator)).size;
-
-        grid.appendChild(createStatCard("Sites d'antennes", totalAntennas, "Toutes technologies"));
-        grid.appendChild(createStatCard("Sites 4G", total4G, "LTE"));
-        grid.appendChild(createStatCard("Sites 5G", total5G, "NR"));
-        grid.appendChild(createStatCard("Opérateurs", operators, "Métropole"));
-        grid.appendChild(createStatCard("Polygones couverture", coveragePolygons, "ARCEP 4G"));
-
-        // Mettre à jour le graphique
-        updateAntennasChart(antennas);
+        if (data.length > 0) {
+            updateAntennasChart(data);
+            updatePanelStats(data, deptCode);
+        }
     } catch (error) {
-        console.error("Erreur chargement stats:", error);
-        const placeholder = document.createElement("p");
-        placeholder.className = "placeholder";
-        placeholder.textContent = "Erreur de chargement.";
-        grid.appendChild(placeholder);
+        console.error("Stats error:", error);
     }
 }
 
-/**
- * Exporte les antennes en CSV selon les filtres actifs.
- */
-function exportCSV() {
-    const dept = document.getElementById("dept-select").value;
-    const operator = document.getElementById("operator-select").value;
-    const params = new URLSearchParams();
-    if (dept) params.set("department", dept);
-    if (operator && operator !== "all") params.set("operator", operator);
-    window.open(`${API_BASE}/antennas/export.csv?${params.toString()}`, "_blank");
+function updatePanelStats(data, deptCode) {
+    const container = document.getElementById("panel-stats");
+    if (!container) return;
+
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    const total = data.reduce((s, d) => s + d.site_count, 0);
+    const t4g = data.filter((d) => d.technology === "4G").reduce((s, d) => s + d.site_count, 0);
+    const t5g = data.filter((d) => d.technology === "5G").reduce((s, d) => s + d.site_count, 0);
+
+    const stats = [
+        ["Total sites", total.toLocaleString("fr-FR")],
+        ["4G LTE", t4g.toLocaleString("fr-FR")],
+        ["5G NR", t5g.toLocaleString("fr-FR")],
+    ];
+
+    if (deptCode) {
+        stats.unshift(["Departement", deptCode]);
+    }
+
+    stats.forEach(([label, value]) => {
+        const row = document.createElement("div");
+        row.className = "stat-mini";
+
+        const labelEl = document.createElement("span");
+        labelEl.className = "stat-mini-label";
+        labelEl.textContent = label;
+
+        const valueEl = document.createElement("span");
+        valueEl.className = "stat-mini-value";
+        valueEl.textContent = value;
+
+        row.appendChild(labelEl);
+        row.appendChild(valueEl);
+        container.appendChild(row);
+    });
+
+    // Update operator counts in toggles
+    for (const op of Object.keys(APP_OPERATORS)) {
+        const countEl = document.getElementById(`op-count-${op}`);
+        if (countEl) {
+            const opTotal = data
+                .filter((d) => d.operator === op)
+                .reduce((s, d) => s + d.site_count, 0);
+            countEl.textContent = opTotal.toLocaleString("fr-FR");
+        }
+    }
 }
 
-/**
- * Recherche une commune par code INSEE et zoome dessus.
- */
+/* === DEPARTMENTS === */
+async function loadDepartments() {
+    try {
+        const response = await fetch(`${API_BASE}/stats/departments`);
+        const departments = await response.json();
+        const select = document.getElementById("dept-select");
+        departments.forEach((dept) => {
+            const option = document.createElement("option");
+            option.value = dept.code;
+            option.textContent = `${dept.code} - ${dept.name}`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Departments error:", error);
+    }
+}
+
+function selectDepartment() {
+    const code = document.getElementById("dept-select").value;
+    if (!code) {
+        map.flyTo({ center: [2.888, 46.603], zoom: 5.5, duration: 1 });
+        loadStats();
+        return;
+    }
+    loadStats(code);
+}
+
+/* === COMMUNE SEARCH === */
 async function searchCommune() {
     const code = document.getElementById("commune-input").value.trim();
     if (!code || code.length < 4) return;
@@ -116,99 +156,26 @@ async function searchCommune() {
         const data = await response.json();
 
         if (data.total === 0) {
-            alert(`Aucune antenne trouvée pour la commune ${code}.`);
+            alert(`Aucune antenne pour la commune ${code}.`);
             return;
         }
 
-        // Zoomer sur la commune
-        map.flyTo({
-            center: [data.center.lon, data.center.lat],
-            zoom: 13,
-            duration: 1.5,
-        });
-
-        // Afficher un résumé dans la console et via popup
-        const summary = data.operators
-            .map((o) => `${o.operator} ${o.technology}: ${o.count}`)
-            .join(", ");
-        console.log(`Commune ${code}: ${data.total} antennes — ${summary}`);
+        map.flyTo({ center: [data.center.lon, data.center.lat], zoom: 13, duration: 1.5 });
     } catch (error) {
-        console.error("Erreur recherche commune:", error);
+        console.error("Commune search error:", error);
     }
 }
 
-// Enter key sur l'input commune
-document.addEventListener("DOMContentLoaded", () => {
-    const input = document.getElementById("commune-input");
-    if (input) {
-        input.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") searchCommune();
-        });
-    }
-});
-
-/**
- * Charge la liste des départements dans le sélecteur.
- */
-async function loadDepartments() {
-    try {
-        const response = await fetch(`${API_BASE}/stats/departments`);
-        const departments = await response.json();
-        const select = document.getElementById("dept-select");
-
-        departments.forEach((dept) => {
-            const option = document.createElement("option");
-            option.value = dept.code;
-            option.textContent = `${dept.code} - ${dept.name} (${dept.antenna_count.toLocaleString("fr-FR")})`;
-            select.appendChild(option);
-        });
-    } catch (error) {
-        console.error("Erreur chargement départements:", error);
-    }
+/* === ACTIONS === */
+function resetView() {
+    map.flyTo({ center: [2.888, 46.603], zoom: 5.5, duration: 1 });
+    document.getElementById("dept-select").value = "";
+    loadStats();
 }
 
-/**
- * Sélectionne un département : zoom + stats locales.
- */
-async function selectDepartment() {
-    const code = document.getElementById("dept-select").value;
-
-    if (!code) {
-        // Retour au national
-        map.flyTo({ center: [2.888, 46.603], zoom: 5.5, duration: 1 });
-        updateStats();
-        return;
-    }
-
-    // Charger les stats du département
-    try {
-        const response = await fetch(`${API_BASE}/antennas/department/${code}`);
-        const data = await response.json();
-
-        if (data.length > 0) {
-            updateAntennasChart(data);
-
-            // Mettre à jour les stats cards
-            const grid = document.getElementById("stats-grid");
-            while (grid.firstChild) grid.removeChild(grid.firstChild);
-
-            const total = data.reduce((s, d) => s + d.site_count, 0);
-            const t4g = data.filter((d) => d.technology === "4G").reduce((s, d) => s + d.site_count, 0);
-            const t5g = data.filter((d) => d.technology === "5G").reduce((s, d) => s + d.site_count, 0);
-            const ops = new Set(data.map((d) => d.operator)).size;
-
-            grid.appendChild(createStatCard("Sites dept " + code, total, "Toutes technologies"));
-            grid.appendChild(createStatCard("Sites 4G", t4g, "LTE"));
-            grid.appendChild(createStatCard("Sites 5G", t5g, "NR"));
-            grid.appendChild(createStatCard("Opérateurs", ops, "Dans ce département"));
-        }
-    } catch (error) {
-        console.error("Erreur stats département:", error);
-    }
+function exportCSV() {
+    const dept = document.getElementById("dept-select").value;
+    const params = new URLSearchParams();
+    if (dept) params.set("department", dept);
+    window.open(`${API_BASE}/antennas/export.csv?${params.toString()}`, "_blank");
 }
-
-// Chargement initial
-document.addEventListener("DOMContentLoaded", () => {
-    loadDepartments();
-    updateStats();
-});
