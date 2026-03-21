@@ -186,6 +186,26 @@ function toggleOperator(op, visible) {
     map.setLayoutProperty(`antennas-${op}`, "visibility", vis);
 }
 
+function filterTechnology(tech) {
+    for (const op of Object.keys(OPERATORS)) {
+        if (tech === "all") {
+            map.setFilter(`coverage-fill-${op}`, ["==", ["get", "operator"], op]);
+            map.setFilter(`coverage-line-${op}`, ["==", ["get", "operator"], op]);
+        } else {
+            map.setFilter(`coverage-fill-${op}`, [
+                "all",
+                ["==", ["get", "operator"], op],
+                ["==", ["get", "technology"], tech],
+            ]);
+            map.setFilter(`coverage-line-${op}`, [
+                "all",
+                ["==", ["get", "operator"], op],
+                ["==", ["get", "technology"], tech],
+            ]);
+        }
+    }
+}
+
 // Zoom indicator
 map.on("zoomend", () => {
     const el = document.getElementById("zoom-indicator");

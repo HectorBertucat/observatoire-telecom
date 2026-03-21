@@ -317,6 +317,36 @@ def list_departments(conn: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
     ]
 
 
+def get_top_communes(
+    conn: duckdb.DuckDBPyConnection,
+    department_code: str | None = None,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    """Retourne les communes avec le plus d'antennes."""
+    params: list[Any] = []
+    where = ""
+    if department_code:
+        where = "WHERE department_code = ?"
+        params.append(department_code)
+    params.append(limit)
+
+    result = conn.execute(
+        f"""
+        SELECT commune_code, commune_name, department_code,
+               SUM(antenna_count) as total
+        FROM mart_coverage_by_commune
+        {where}
+        GROUP BY commune_code, commune_name, department_code
+        ORDER BY total DESC
+        LIMIT ?
+        """,
+        params,
+    ).fetchall()
+
+    columns = ["commune_code", "commune_name", "department_code", "total"]
+    return [dict(zip(columns, row, strict=True)) for row in result]
+
+
 def get_table_counts(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
     """Retourne le nombre de lignes par table."""
     tables = [row[0] for row in conn.execute("SHOW TABLES").fetchall()]

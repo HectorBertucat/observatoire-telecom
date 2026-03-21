@@ -10,6 +10,7 @@ from observatoire.db.queries import (
     get_antenna_stats,
     get_raw_coverage_stats,
     get_table_counts,
+    get_top_communes,
     list_departments,
 )
 
@@ -40,6 +41,16 @@ async def antenna_stats(
 async def departments(db: DB) -> list[dict[str, Any]]:
     """Liste des départements avec nombre d'antennes."""
     return list_departments(db)
+
+
+@router.get("/top-communes")
+async def top_communes(
+    db: DB,
+    department: str | None = Query(None, description="Code département"),
+    limit: int = Query(10, ge=1, le=50),
+) -> list[dict[str, Any]]:
+    """Top communes par nombre d'antennes."""
+    return get_top_communes(db, department, limit)
 
 
 @router.get("/tables")
