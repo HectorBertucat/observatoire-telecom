@@ -30,8 +30,8 @@ const map = new maplibregl.Map({
             labels: {
                 type: "raster",
                 tiles: [
-                    "https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}@2x.png",
-                    "https://b.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}@2x.png",
+                    "https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}@2x.png?lang=fr",
+                    "https://b.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}@2x.png?lang=fr",
                 ],
                 tileSize: 256,
             },

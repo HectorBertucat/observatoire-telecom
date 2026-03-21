@@ -315,7 +315,7 @@ header h1 {
     backdrop-filter: blur(12px);
     border-top: 1px solid var(--border);
     padding: 16px 20px;
-    height: 260px;
+    height: 280px;
     display: flex;
     gap: 20px;
     flex-shrink: 0;
@@ -338,8 +338,8 @@ header h1 {
 }
 
 .chart-card canvas {
-    flex: 1;
-    min-height: 0;
+    width: 100% !important;
+    height: calc(100% - 24px) !important;
 }
 
 /* === STAT CARDS ROW === */
