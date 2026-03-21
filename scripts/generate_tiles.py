@@ -61,7 +61,7 @@ def export_coverage_geojson(technology: str = "4G") -> Path:
                 technology,
                 quarter
             FROM raw_coverage
-            WHERE technology = $2
+            WHERE ($2 = 'all' OR technology = $2)
             """,
             [SIMPLIFY_TOLERANCE, technology],
         ).fetchall()
@@ -208,7 +208,7 @@ def generate_pmtiles(coverage_path: Path, antennas_path: Path) -> Path:
 
 def main() -> None:
     """Pipeline complète : GeoJSON → PMTiles."""
-    technology = sys.argv[1] if len(sys.argv) > 1 else "4G"
+    technology = sys.argv[1] if len(sys.argv) > 1 else "all"
 
     coverage_path = export_coverage_geojson(technology)
     antennas_path = export_antennas_geojson()
