@@ -86,6 +86,11 @@ Le projet maintient une documentation vivante qui DOIT être mise à jour :
 - **docs/adr/** : un ADR par décision architecturale majeure
 - **docs/data-dictionary.md** : schéma des tables DuckDB
 
+## Prochaines etapes (voir docs/ROADMAP.md)
+- Phase 2 : trajets SNCF + couverture le long des lignes ferroviaires
+- Phase 3 : donnees de couverture reelle (ARCEP crowdsourcing + Ookla Speedtest)
+- Phase 4 : ameliorations UX (split view, PWA, Docker deploy)
+
 **IMPORTANT — Règle de maintenance documentaire :**
 Après chaque modification significative (nouvelle feature, fix important, changement
 d'architecture), mettre à jour :
