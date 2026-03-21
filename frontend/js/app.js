@@ -26,11 +26,21 @@ function buildOperatorToggles() {
     for (const [op, info] of Object.entries(APP_OPERATORS)) {
         const label = document.createElement("label");
         label.className = "operator-toggle";
+        label.dataset.op = op;
 
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.checked = true;
-        cb.addEventListener("change", () => toggleOperator(op, cb.checked));
+        cb.addEventListener("change", () => {
+            toggleOperator(op, cb.checked);
+            // If only one operator checked, highlight it
+            const checked = document.querySelectorAll("#operator-toggles input:checked");
+            if (checked.length === 1) {
+                setOperatorHighlight(checked[0].closest(".operator-toggle").dataset.op);
+            } else {
+                setOperatorHighlight("all");
+            }
+        });
 
         const dot = document.createElement("span");
         dot.className = "operator-dot";

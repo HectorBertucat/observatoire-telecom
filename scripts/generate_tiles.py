@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-SIMPLIFY_TOLERANCE = 1000  # mètres (Lambert-93) — bon compromis taille/détail
+SIMPLIFY_TOLERANCE = 750  # mètres (Lambert-93) — sweet spot détail/perf
 
 OPERATORS = {
     "OF": "Orange",
@@ -153,10 +153,10 @@ def generate_pmtiles(coverage_path: Path, antennas_path: Path) -> Path:
             "-L",
             f"coverage:{coverage_path}",
             "--minimum-zoom=4",
-            "--maximum-zoom=12",
+            "--maximum-zoom=13",
             "--no-feature-limit",
             "--no-tile-size-limit",
-            "--simplification=10",
+            "--simplification=8",
             "--detect-shared-borders",
         ],
         capture_output=True,

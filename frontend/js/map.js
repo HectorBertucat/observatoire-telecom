@@ -1,28 +1,39 @@
-/* Carte MapLibre GL JS — dark theme + CartoDB Positron */
+/* Carte MapLibre GL JS — dark pro theme */
 
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol("pmtiles", protocol.tile);
 
 const OPERATORS = {
-    OF:   { name: "Orange",           color: "#f97316" },
-    BYT:  { name: "Bouygues Telecom", color: "#3b82f6" },
-    FREE: { name: "Free Mobile",      color: "#ec4899" },
-    SFR:  { name: "SFR",              color: "#ef4444" },
+    OF:   { name: "Orange",           color: "#f97316", colorLight: "rgba(249,115,22,0.15)" },
+    BYT:  { name: "Bouygues Telecom", color: "#3b82f6", colorLight: "rgba(59,130,246,0.15)" },
+    FREE: { name: "Free Mobile",      color: "#ec4899", colorLight: "rgba(236,72,153,0.15)" },
+    SFR:  { name: "SFR",              color: "#ef4444", colorLight: "rgba(239,68,68,0.15)" },
 };
+
+let activeOperator = "all"; // "all" or specific operator code
 
 const map = new maplibregl.Map({
     container: "map",
     style: {
         version: 8,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
         sources: {
             basemap: {
                 type: "raster",
                 tiles: [
-                    "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
-                    "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+                    "https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}@2x.png",
+                    "https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}@2x.png",
                 ],
                 tileSize: 256,
                 attribution: "&copy; CARTO &copy; OpenStreetMap",
+            },
+            labels: {
+                type: "raster",
+                tiles: [
+                    "https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}@2x.png",
+                    "https://b.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}@2x.png",
+                ],
+                tileSize: 256,
             },
             coverage: {
                 type: "vector",
@@ -34,6 +45,7 @@ const map = new maplibregl.Map({
             },
         },
         layers: [
+            // Basemap sans labels (sous la couverture)
             {
                 id: "basemap",
                 type: "raster",
@@ -41,6 +53,7 @@ const map = new maplibregl.Map({
                 minzoom: 0,
                 maxzoom: 19,
             },
+            // Couverture polygones par opérateur
             ...Object.entries(OPERATORS).flatMap(([op, info]) => [
                 {
                     id: `coverage-fill-${op}`,
@@ -50,7 +63,7 @@ const map = new maplibregl.Map({
                     filter: ["==", ["get", "operator"], op],
                     paint: {
                         "fill-color": info.color,
-                        "fill-opacity": 0.3,
+                        "fill-opacity": 0.25,
                     },
                 },
                 {
@@ -61,36 +74,78 @@ const map = new maplibregl.Map({
                     filter: ["==", ["get", "operator"], op],
                     paint: {
                         "line-color": info.color,
-                        "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.3, 10, 1],
-                        "line-opacity": 0.5,
+                        "line-width": [
+                            "interpolate", ["linear"], ["zoom"],
+                            4, 0.2, 8, 0.5, 12, 1, 14, 1.5,
+                        ],
+                        "line-opacity": 0.4,
                     },
                 },
             ]),
+            // Labels au-dessus de la couverture
+            {
+                id: "labels",
+                type: "raster",
+                source: "labels",
+                minzoom: 0,
+                maxzoom: 19,
+            },
+            // Antennes : cercles par opérateur
             ...Object.entries(OPERATORS).map(([op, info]) => ({
                 id: `antennas-${op}`,
                 type: "circle",
                 source: "antennas",
                 "source-layer": "antennas",
                 filter: ["==", ["get", "operator"], op],
-                minzoom: 8,
+                minzoom: 9,
                 paint: {
-                    "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 1.5, 11, 3, 14, 6],
+                    "circle-radius": [
+                        "interpolate", ["linear"], ["zoom"],
+                        9, 1.5, 11, 2.5, 13, 4, 15, 7,
+                    ],
                     "circle-color": info.color,
-                    "circle-stroke-color": "rgba(255,255,255,0.6)",
-                    "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 0, 11, 0.5, 14, 1],
-                    "circle-opacity": 0.8,
+                    "circle-stroke-color": "rgba(255,255,255,0.7)",
+                    "circle-stroke-width": [
+                        "interpolate", ["linear"], ["zoom"],
+                        9, 0, 11, 0.5, 14, 1,
+                    ],
+                    "circle-opacity": 0.85,
+                },
+            })),
+            // 5G antennes avec halo plus grand (proxy couverture)
+            ...Object.entries(OPERATORS).map(([op, info]) => ({
+                id: `antennas-5g-halo-${op}`,
+                type: "circle",
+                source: "antennas",
+                "source-layer": "antennas",
+                filter: [
+                    "all",
+                    ["==", ["get", "operator"], op],
+                    ["==", ["get", "technology"], "5G"],
+                ],
+                minzoom: 10,
+                paint: {
+                    "circle-radius": [
+                        "interpolate", ["linear"], ["zoom"],
+                        10, 6, 12, 12, 14, 25,
+                    ],
+                    "circle-color": info.color,
+                    "circle-opacity": 0.08,
+                    "circle-stroke-width": 0,
                 },
             })),
         ],
     },
     center: [2.888, 46.603],
     zoom: 5.5,
-    maxZoom: 15,
+    maxZoom: 16,
 });
 
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
-// Popup click — antennas first, then coverage
+/* === INTERACTIONS === */
+
+// Click popup
 map.on("click", (e) => {
     const antennaLayers = Object.keys(OPERATORS).map((op) => `antennas-${op}`);
     const antennaFeats = map.queryRenderedFeatures(e.point, { layers: antennaLayers });
@@ -122,18 +177,18 @@ map.on("click", (e) => {
         .setLngLat(e.lngLat)
         .setHTML(
             `<div style="font-size:12px">` +
-            `<div style="color:#94a3b8;margin-bottom:4px">${coverageFeats[0].properties.technology || "4G"}</div>` +
+            `<div style="color:#94a3b8;margin-bottom:4px">${coverageFeats[0].properties.technology || ""}</div>` +
             lines.join("<br>") + `</div>`
         )
         .addTo(map);
 });
 
-// Right-click → nearby antennas
+// Right-click nearby
 map.on("contextmenu", async (e) => {
     e.preventDefault();
     const { lng, lat } = e.lngLat;
     try {
-        const res = await fetch(`/api/v1/antennas/nearby?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&radius=2&limit=10`);
+        const res = await fetch(`/api/v1/antennas/nearby?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&radius=2&limit=15`);
         const data = await res.json();
         if (data.length === 0) {
             new maplibregl.Popup({ maxWidth: "250px", className: "dark-popup" })
@@ -143,25 +198,32 @@ map.on("contextmenu", async (e) => {
             return;
         }
         const byOp = {};
-        data.forEach((a) => { byOp[a.operator] = (byOp[a.operator] || 0) + 1; });
+        const byTech = {};
+        data.forEach((a) => {
+            byOp[a.operator] = (byOp[a.operator] || 0) + 1;
+            byTech[a.technology] = (byTech[a.technology] || 0) + 1;
+        });
         const opLines = Object.entries(byOp).map(([op, count]) => {
             const info = OPERATORS[op] || { name: op, color: "#999" };
             return `<span style="color:${info.color}">&#9679;</span> ${info.name}: ${count}`;
         }).join("<br>");
-        new maplibregl.Popup({ maxWidth: "250px", className: "dark-popup" })
+        const techLine = Object.entries(byTech).map(([t, c]) => `${t}:${c}`).join(" · ");
+
+        new maplibregl.Popup({ maxWidth: "260px", className: "dark-popup" })
             .setLngLat(e.lngLat)
             .setHTML(
                 `<div style="font-size:12px">` +
-                `<b>${data.length} antennes</b> dans 2km<br>` +
-                `<span style="color:#64748b">Plus proche: ${data[0].distance_km}km</span>` +
-                `<hr style="margin:4px 0;border:none;border-top:1px solid rgba(255,255,255,0.1)">` +
+                `<b>${data.length} antennes</b> dans 2km` +
+                `<span style="color:#64748b;margin-left:6px">${techLine}</span><br>` +
+                `<span style="color:#64748b">Plus proche: ${data[0].operator} ${data[0].technology} (${data[0].distance_km}km)</span>` +
+                `<hr style="margin:5px 0;border:none;border-top:1px solid rgba(255,255,255,0.1)">` +
                 opLines + `</div>`
             )
             .addTo(map);
     } catch (err) { console.error("Nearby error:", err); }
 });
 
-// Cursor pointer
+// Cursor
 for (const op of Object.keys(OPERATORS)) {
     for (const prefix of ["coverage-fill-", "antennas-"]) {
         map.on("mouseenter", `${prefix}${op}`, () => { map.getCanvas().style.cursor = "pointer"; });
@@ -169,13 +231,24 @@ for (const op of Object.keys(OPERATORS)) {
     }
 }
 
-function filterByOperator(operator) {
+/* === OPERATOR HIGHLIGHT MODE === */
+function setOperatorHighlight(operator) {
+    activeOperator = operator;
     for (const op of Object.keys(OPERATORS)) {
-        const visible = operator === "all" || operator === op;
-        const vis = visible ? "visible" : "none";
-        map.setLayoutProperty(`coverage-fill-${op}`, "visibility", vis);
-        map.setLayoutProperty(`coverage-line-${op}`, "visibility", vis);
-        map.setLayoutProperty(`antennas-${op}`, "visibility", vis);
+        const isActive = operator === "all" || operator === op;
+        const fillOpacity = isActive ? (operator === "all" ? 0.25 : 0.45) : 0.05;
+        const lineOpacity = isActive ? (operator === "all" ? 0.4 : 0.7) : 0.05;
+
+        map.setPaintProperty(`coverage-fill-${op}`, "fill-opacity", fillOpacity);
+        map.setPaintProperty(`coverage-line-${op}`, "line-opacity", lineOpacity);
+
+        // Antennes
+        const antennaOpacity = isActive ? 0.85 : 0.15;
+        map.setPaintProperty(`antennas-${op}`, "circle-opacity", antennaOpacity);
+
+        // 5G halos
+        const haloOpacity = isActive ? 0.08 : 0.01;
+        map.setPaintProperty(`antennas-5g-halo-${op}`, "circle-opacity", haloOpacity);
     }
 }
 
@@ -184,35 +257,30 @@ function toggleOperator(op, visible) {
     map.setLayoutProperty(`coverage-fill-${op}`, "visibility", vis);
     map.setLayoutProperty(`coverage-line-${op}`, "visibility", vis);
     map.setLayoutProperty(`antennas-${op}`, "visibility", vis);
+    map.setLayoutProperty(`antennas-5g-halo-${op}`, "visibility", vis);
 }
 
-function filterTechnology(tech) {
+function filterTechnologyOnMap(tech) {
     for (const op of Object.keys(OPERATORS)) {
+        const baseFilter = ["==", ["get", "operator"], op];
         if (tech === "all") {
-            map.setFilter(`coverage-fill-${op}`, ["==", ["get", "operator"], op]);
-            map.setFilter(`coverage-line-${op}`, ["==", ["get", "operator"], op]);
+            map.setFilter(`coverage-fill-${op}`, baseFilter);
+            map.setFilter(`coverage-line-${op}`, baseFilter);
         } else {
-            map.setFilter(`coverage-fill-${op}`, [
-                "all",
-                ["==", ["get", "operator"], op],
-                ["==", ["get", "technology"], tech],
-            ]);
-            map.setFilter(`coverage-line-${op}`, [
-                "all",
-                ["==", ["get", "operator"], op],
-                ["==", ["get", "technology"], tech],
-            ]);
+            const filter = ["all", baseFilter, ["==", ["get", "technology"], tech]];
+            map.setFilter(`coverage-fill-${op}`, filter);
+            map.setFilter(`coverage-line-${op}`, filter);
         }
     }
 }
 
-// Zoom indicator
+/* === ZOOM INDICATOR === */
 map.on("zoomend", () => {
     const el = document.getElementById("zoom-indicator");
     if (el) el.textContent = `z${map.getZoom().toFixed(1)}`;
 });
 
-// Build legend
+/* === LEGEND === */
 map.on("load", () => {
     const container = document.getElementById("map-legend");
     if (!container) return;
