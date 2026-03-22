@@ -292,12 +292,11 @@ function drawRouteLine(geojson) {
         type: "line",
         source: "route",
         filter: ["==", ["geometry-type"], "LineString"],
+        layout: { "line-cap": "round", "line-join": "round" },
         paint: {
             "line-color": "#1e293b",
             "line-width": 7,
             "line-opacity": 0.9,
-            "line-cap": "round",
-            "line-join": "round",
         },
     }, "labels");
 
@@ -307,12 +306,11 @@ function drawRouteLine(geojson) {
         type: "line",
         source: "route",
         filter: ["==", ["geometry-type"], "LineString"],
+        layout: { "line-cap": "round", "line-join": "round" },
         paint: {
             "line-color": "#e2e8f0",
             "line-width": 3,
             "line-opacity": 0.9,
-            "line-cap": "round",
-            "line-join": "round",
         },
     }, "labels");
 
@@ -322,12 +320,12 @@ function drawRouteLine(geojson) {
         type: "line",
         source: "route",
         filter: ["==", ["geometry-type"], "LineString"],
+        layout: { "line-cap": "butt" },
         paint: {
             "line-color": "#3b82f6",
             "line-width": 3,
             "line-dasharray": [2, 3],
             "line-opacity": 0.8,
-            "line-cap": "butt",
         },
     }, "labels");
 

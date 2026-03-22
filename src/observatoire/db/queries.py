@@ -645,8 +645,9 @@ def find_transfer_options(
     """Trouve les correspondances entre deux groupes de lignes.
 
     Utilise la proximite geometrique (ST_DWithin 500m) pour trouver
-    une ligne-pont, puis identifie les gares de correspondance les
-    plus proches du point de jonction.
+    une ligne-pont, puis identifie la gare de correspondance la plus
+    proche du point de jonction entre la ligne depart et la ligne-pont.
+    Deduplication par gare de correspondance (une seule option par ville).
     """
     if not dep_line_ids or not arr_line_ids:
         return []
@@ -658,7 +659,8 @@ def find_transfer_options(
         f"""
         WITH bridge AS (
             SELECT DISTINCT l_bridge.line_id, l_bridge.line_name,
-                   l_bridge.length_km, l_bridge.geometry
+                   l_bridge.length_km, l_bridge.geometry,
+                   l_dep.geometry AS dep_geometry
             FROM ref_railway_lines l_dep
             JOIN ref_railway_lines l_bridge
                 ON l_dep.line_id != l_bridge.line_id
@@ -670,23 +672,34 @@ def find_transfer_options(
               AND l_arr.line_id IN ({arr_ph})
               AND l_bridge.line_id NOT IN ({dep_ph})
               AND l_bridge.line_id NOT IN ({arr_ph})
+        ),
+        bridge_with_station AS (
+            SELECT
+                b.line_id,
+                b.line_name,
+                ROUND(b.length_km, 1) AS length_km,
+                -- Trouver la gare la plus proche du point de contact
+                -- entre la ligne depart et la ligne-pont
+                (SELECT s.station_name
+                 FROM ref_railway_stations s
+                 WHERE s.line_code = b.line_id
+                    OR s.line_code IN ({dep_ph})
+                 ORDER BY ST_Distance(
+                     ST_Transform(
+                         ST_FlipCoordinates(ST_Point(s.longitude, s.latitude)),
+                         'EPSG:4326', 'EPSG:2154'
+                     ),
+                     ST_ClosestPoint(b.dep_geometry, b.geometry)
+                 )
+                 LIMIT 1
+                ) AS transfer_station
+            FROM bridge b
         )
-        SELECT
-            b.line_id,
-            b.line_name,
-            ROUND(b.length_km, 1) AS length_km,
-            -- Gare la plus proche du point de jonction dep/bridge
-            (SELECT s.station_name
-             FROM ref_railway_stations s
-             WHERE s.line_code IN ({dep_ph})
-                OR s.line_code = b.line_id
-             ORDER BY (s.latitude - ?) * (s.latitude - ?)
-                    + (s.longitude - ?) * (s.longitude - ?)
-                      * COS(RADIANS(?)) * COS(RADIANS(?))
-             LIMIT 1) AS transfer_station
-        FROM bridge b
-        ORDER BY b.length_km DESC
-        LIMIT 5
+        SELECT line_id, line_name, length_km, transfer_station
+        FROM bridge_with_station
+        WHERE transfer_station IS NOT NULL
+        GROUP BY transfer_station, line_id, line_name, length_km
+        ORDER BY length_km DESC
         """,
         [
             *dep_line_ids,
@@ -694,18 +707,35 @@ def find_transfer_options(
             *dep_line_ids,
             *arr_line_ids,
             *dep_line_ids,
-            # Pour la sous-requete: point milieu dep/arr comme approximation
-            (dep_lat + arr_lat) / 2,
-            (dep_lat + arr_lat) / 2,
-            (dep_lon + arr_lon) / 2,
-            (dep_lon + arr_lon) / 2,
-            (dep_lat + arr_lat) / 2,
-            (dep_lat + arr_lat) / 2,
         ],
     ).fetchall()
 
+    # Deduplication par gare de correspondance
+    # Exclure les gares de depart/arrivee (pas une vraie correspondance)
+    dep_station = conn.execute(
+        "SELECT station_name FROM ref_railway_stations "
+        "ORDER BY (latitude - ?) * (latitude - ?) "
+        "+ (longitude - ?) * (longitude - ?) LIMIT 1",
+        [dep_lat, dep_lat, dep_lon, dep_lon],
+    ).fetchone()
+    arr_station = conn.execute(
+        "SELECT station_name FROM ref_railway_stations "
+        "ORDER BY (latitude - ?) * (latitude - ?) "
+        "+ (longitude - ?) * (longitude - ?) LIMIT 1",
+        [arr_lat, arr_lat, arr_lon, arr_lon],
+    ).fetchone()
+    exclude = {dep_station[0] if dep_station else "", arr_station[0] if arr_station else ""}
+
+    seen_stations: set[str] = set()
+    deduped: list[dict[str, Any]] = []
     columns = ["line_id", "line_name", "length_km", "transfer_station"]
-    return [dict(zip(columns, row, strict=True)) for row in result]
+    for row in result:
+        d = dict(zip(columns, row, strict=True))
+        station = d["transfer_station"]
+        if station not in seen_stations and station not in exclude:
+            seen_stations.add(station)
+            deduped.append(d)
+    return deduped[:5]
 
 
 def get_route_segment_geojson(
