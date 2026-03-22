@@ -540,19 +540,20 @@ async function selectTransferRoute(depLineId, transferLineId, arrLineId, dep, ar
     }
 
     try {
-        // 3 segments : dep→transfer, transfer line, transfer→arr
-        const [g1, g2, g3] = await Promise.all([
+        // 2 segments : dep→transfer sur la ligne depart, transfer→arr sur la ligne arrivee
+        const [g1, g2] = await Promise.all([
             _fetchSegment(depLineId, dep.latitude, dep.longitude, tLat, tLon),
-            _fetchSegment(transferLineId, tLat, tLon, arr.latitude, arr.longitude),
             _fetchSegment(arrLineId, tLat, tLon, arr.latitude, arr.longitude),
         ]);
+
+        // Filtrer les segments vides (< 2 coords)
+        const lineFeatures = [...(g1.features || []), ...(g2.features || [])]
+            .filter(f => f.geometry.coordinates.length >= 2);
 
         const merged = {
             type: "FeatureCollection",
             features: [
-                ...(g1.features || []),
-                ...(g2.features || []),
-                ...(g3.features || []),
+                ...lineFeatures,
                 _stationMarker(dep.station_name, dep.latitude, dep.longitude, "departure"),
                 _stationMarker(transferInfo.transfer_station, tLat, tLon, "transfer"),
                 _stationMarker(arr.station_name, arr.latitude, arr.longitude, "arrival"),
@@ -576,9 +577,8 @@ async function analyzeRoute() {
     btn.textContent = "...";
     while (resultsDiv.firstChild) resultsDiv.removeChild(resultsDiv.firstChild);
 
-    // Collecter toutes les lignes a analyser
+    // Analyser les lignes reelles du trajet (dep + arr, pas la ligne-pont)
     const lineIds = [_route.selectedLineId];
-    if (_route.transferLineId) lineIds.push(_route.transferLineId);
     if (_route.arrLineId && _route.arrLineId !== _route.selectedLineId) {
         lineIds.push(_route.arrLineId);
     }
