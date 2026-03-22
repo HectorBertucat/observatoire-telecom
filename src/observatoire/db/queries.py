@@ -816,6 +816,14 @@ def get_route_segment_geojson(
     else:
         segment_coords = coords
 
+    # Downsampler pour les segments longs (MapLibre gere mal > 200 coords)
+    max_points = 150
+    if len(segment_coords) > max_points:
+        step = len(segment_coords) / max_points
+        segment_coords = [segment_coords[int(i * step)] for i in range(max_points)] + [
+            segment_coords[-1]
+        ]
+
     segment_km = round(result[5] * (frac_to - frac_from), 1)
 
     feature: dict[str, Any] = {

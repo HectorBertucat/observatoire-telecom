@@ -4,6 +4,8 @@ import json
 import logging
 from pathlib import Path
 
+import duckdb
+
 from observatoire.db.connection import db_session
 
 logger = logging.getLogger(__name__)
@@ -78,7 +80,7 @@ def load_railway_lines(geojson_path: Path) -> int:
         return inserted
 
 
-def _build_line_names(conn: object) -> None:
+def _build_line_names(conn: duckdb.DuckDBPyConnection) -> None:
     """Construit les noms de lignes depuis les gares associees.
 
     Pour chaque ligne, prend la premiere et la derniere gare voyageurs
@@ -87,7 +89,7 @@ def _build_line_names(conn: object) -> None:
     import contextlib
 
     with contextlib.suppress(Exception):
-        conn.execute(  # type: ignore[union-attr]
+        conn.execute(
             """
             UPDATE ref_railway_lines SET line_name = sub.label
             FROM (

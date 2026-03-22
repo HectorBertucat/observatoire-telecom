@@ -416,17 +416,14 @@ async function showDirectRoute(lineId, dep, arr) {
     document.getElementById("btn-analyze-route").disabled = false;
 
     try {
-        const geojson = await _fetchSegment(
-            lineId, dep.latitude, dep.longitude, arr.latitude, arr.longitude
+        const segUrl = `${API_BASE}/routes/segment?line_id=${lineId}&from_lat=${dep.latitude}&from_lon=${dep.longitude}&to_lat=${arr.latitude}&to_lon=${arr.longitude}`;
+        drawRoute(
+            [segUrl],
+            [
+                { name: dep.station_name, lat: dep.latitude, lon: dep.longitude, role: "departure" },
+                { name: arr.station_name, lat: arr.latitude, lon: arr.longitude, role: "arrival" },
+            ]
         );
-
-        // Ajouter les marqueurs de gare
-        geojson.features.push(
-            _stationMarker(dep.station_name, dep.latitude, dep.longitude, "departure"),
-            _stationMarker(arr.station_name, arr.latitude, arr.longitude, "arrival"),
-        );
-
-        if (typeof drawRouteLine === "function") drawRouteLine(geojson);
 
         const infoDiv = document.getElementById("selected-line-info");
         while (infoDiv.firstChild) infoDiv.removeChild(infoDiv.firstChild);
@@ -530,7 +527,6 @@ async function selectTransferRoute(depLineId, transferLineId, arrLineId, dep, ar
     _route.arrLineId = arrLineId;
     document.getElementById("btn-analyze-route").disabled = false;
 
-    // Coordonnees reelles de la gare de correspondance
     const tLat = transferInfo.transfer_lat;
     const tLon = transferInfo.transfer_lon;
 
@@ -540,27 +536,17 @@ async function selectTransferRoute(depLineId, transferLineId, arrLineId, dep, ar
     }
 
     try {
-        // 2 segments : dep→transfer sur la ligne depart, transfer→arr sur la ligne arrivee
-        const [g1, g2] = await Promise.all([
-            _fetchSegment(depLineId, dep.latitude, dep.longitude, tLat, tLon),
-            _fetchSegment(arrLineId, tLat, tLon, arr.latitude, arr.longitude),
-        ]);
+        const segUrl1 = `${API_BASE}/routes/segment?line_id=${depLineId}&from_lat=${dep.latitude}&from_lon=${dep.longitude}&to_lat=${tLat}&to_lon=${tLon}`;
+        const segUrl2 = `${API_BASE}/routes/segment?line_id=${arrLineId}&from_lat=${tLat}&from_lon=${tLon}&to_lat=${arr.latitude}&to_lon=${arr.longitude}`;
 
-        // Filtrer les segments vides (< 2 coords)
-        const lineFeatures = [...(g1.features || []), ...(g2.features || [])]
-            .filter(f => f.geometry.coordinates.length >= 2);
-
-        const merged = {
-            type: "FeatureCollection",
-            features: [
-                ...lineFeatures,
-                _stationMarker(dep.station_name, dep.latitude, dep.longitude, "departure"),
-                _stationMarker(transferInfo.transfer_station, tLat, tLon, "transfer"),
-                _stationMarker(arr.station_name, arr.latitude, arr.longitude, "arrival"),
-            ],
-        };
-
-        if (typeof drawRouteLine === "function") drawRouteLine(merged);
+        drawRoute(
+            [segUrl1, segUrl2],
+            [
+                { name: dep.station_name, lat: dep.latitude, lon: dep.longitude, role: "departure" },
+                { name: transferInfo.transfer_station, lat: tLat, lon: tLon, role: "transfer" },
+                { name: arr.station_name, lat: arr.latitude, lon: arr.longitude, role: "arrival" },
+            ]
+        );
     } catch (err) {
         console.error("Transfer route display error:", err);
     }
