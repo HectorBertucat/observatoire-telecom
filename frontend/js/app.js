@@ -375,14 +375,24 @@ async function findAndShowRoute() {
     const depLines = (dep.line_codes || "").split(",").filter(Boolean);
     const arrLines = (arr.line_codes || "").split(",").filter(Boolean);
 
-    // Chercher une ligne en commun
+    // Chercher une ligne en commun (trajet direct)
     const common = depLines.filter((l) => arrLines.includes(l));
-    const lineId = common.length > 0 ? common[0] : depLines[0];
 
-    _route.selectedLineId = lineId;
-    const btn = document.getElementById("btn-analyze-route");
-    btn.disabled = false;
     document.getElementById("btn-clear-route").style.display = "block";
+
+    if (common.length > 0) {
+        // Trajet direct
+        await showDirectRoute(common[0], dep, arr);
+    } else {
+        // Pas de trajet direct : chercher les correspondances
+        await findTransfers(depLines, arrLines, dep, arr);
+    }
+}
+
+async function showDirectRoute(lineId, dep, arr) {
+    _route.selectedLineId = lineId;
+    _route.transferLineId = null;
+    document.getElementById("btn-analyze-route").disabled = false;
 
     try {
         const [geojsonRes, linesRes] = await Promise.all([
@@ -392,10 +402,8 @@ async function findAndShowRoute() {
         const geojson = await geojsonRes.json();
         const lines = await linesRes.json();
 
-        // Afficher la ligne sur la carte
         if (typeof drawRouteLine === "function") drawRouteLine(geojson);
 
-        // Afficher les infos
         const infoDiv = document.getElementById("selected-line-info");
         while (infoDiv.firstChild) infoDiv.removeChild(infoDiv.firstChild);
 
@@ -407,13 +415,111 @@ async function findAndShowRoute() {
 
         const lineDetail = document.createElement("div");
         lineDetail.className = "line-detail";
-        const label = common.length > 0 ? "ligne directe" : "ligne depart";
-        lineDetail.textContent = `${lineInfo.length_km || "?"} km — ${label} ${lineId}`;
+        lineDetail.textContent = `Trajet direct — ${lineInfo.length_km || "?"} km (ligne ${lineId})`;
         infoDiv.appendChild(lineDetail);
 
         infoDiv.style.display = "block";
     } catch (err) {
-        console.error("Find route error:", err);
+        console.error("Direct route error:", err);
+    }
+}
+
+async function findTransfers(depLines, arrLines, dep, arr) {
+    const infoDiv = document.getElementById("selected-line-info");
+    while (infoDiv.firstChild) infoDiv.removeChild(infoDiv.firstChild);
+
+    const loading = document.createElement("div");
+    loading.className = "line-detail";
+    loading.textContent = "Recherche de correspondances...";
+    infoDiv.appendChild(loading);
+    infoDiv.style.display = "block";
+
+    try {
+        const params = new URLSearchParams({
+            dep_lines: depLines.join(","),
+            arr_lines: arrLines.join(","),
+        });
+        const res = await fetch(`${API_BASE}/routes/transfers?${params}`);
+        const transfers = await res.json();
+
+        while (infoDiv.firstChild) infoDiv.removeChild(infoDiv.firstChild);
+
+        if (transfers.length === 0) {
+            const noRoute = document.createElement("div");
+            noRoute.className = "line-detail";
+            noRoute.textContent = "Aucune correspondance trouvee entre ces gares.";
+            infoDiv.appendChild(noRoute);
+            return;
+        }
+
+        const header = document.createElement("div");
+        header.className = "line-name";
+        header.textContent = `${dep.station_name} → ${arr.station_name}`;
+        infoDiv.appendChild(header);
+
+        const hint = document.createElement("div");
+        hint.className = "line-detail";
+        hint.textContent = "Pas de trajet direct — choisir une correspondance :";
+        infoDiv.appendChild(hint);
+
+        const list = document.createElement("div");
+        list.style.cssText = "margin-top:6px";
+
+        transfers.forEach((t) => {
+            const option = document.createElement("div");
+            option.className = "transfer-option";
+
+            const label = document.createElement("span");
+            label.textContent = t.line_name || `Ligne ${t.line_id}`;
+
+            const km = document.createElement("span");
+            km.className = "transfer-km";
+            km.textContent = `${t.length_km} km`;
+
+            option.appendChild(label);
+            option.appendChild(km);
+
+            option.addEventListener("click", () => {
+                // Deselectionner les autres
+                list.querySelectorAll(".transfer-option").forEach((o) =>
+                    o.classList.remove("selected")
+                );
+                option.classList.add("selected");
+                selectTransferRoute(depLines[0], t.line_id, arrLines[0], dep, arr, t);
+            });
+
+            list.appendChild(option);
+        });
+
+        infoDiv.appendChild(list);
+    } catch (err) {
+        console.error("Transfer search error:", err);
+    }
+}
+
+async function selectTransferRoute(depLineId, transferLineId, arrLineId, dep, arr, transferInfo) {
+    _route.selectedLineId = depLineId;
+    _route.transferLineId = transferLineId;
+    _route.arrLineId = arrLineId;
+    document.getElementById("btn-analyze-route").disabled = false;
+
+    // Charger et afficher les 3 lignes (depart, correspondance, arrivee)
+    try {
+        const [g1, g2, g3] = await Promise.all([
+            fetch(`${API_BASE}/routes/lines/${depLineId}/geojson`).then((r) => r.json()),
+            fetch(`${API_BASE}/routes/lines/${transferLineId}/geojson`).then((r) => r.json()),
+            fetch(`${API_BASE}/routes/lines/${arrLineId}/geojson`).then((r) => r.json()),
+        ]);
+
+        // Fusionner les features
+        const merged = {
+            type: "FeatureCollection",
+            features: [...g1.features, ...g2.features, ...g3.features],
+        };
+
+        if (typeof drawRouteLine === "function") drawRouteLine(merged);
+    } catch (err) {
+        console.error("Transfer route display error:", err);
     }
 }
 
@@ -428,15 +534,49 @@ async function analyzeRoute() {
     btn.textContent = "...";
     while (resultsDiv.firstChild) resultsDiv.removeChild(resultsDiv.firstChild);
 
+    // Collecter toutes les lignes a analyser
+    const lineIds = [_route.selectedLineId];
+    if (_route.transferLineId) lineIds.push(_route.transferLineId);
+    if (_route.arrLineId && _route.arrLineId !== _route.selectedLineId) {
+        lineIds.push(_route.arrLineId);
+    }
+
     try {
-        const res = await fetch(`${API_BASE}/routes/coverage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ line_id: _route.selectedLineId, technology: tech }),
+        // Lancer les analyses en parallele
+        const results = await Promise.all(
+            lineIds.map((id) =>
+                fetch(`${API_BASE}/routes/coverage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ line_id: id, technology: tech }),
+                }).then((r) => r.json())
+            )
+        );
+
+        // Agreger : pour chaque operateur, moyenne ponderee par longueur
+        const byOp = {};
+        let totalKm = 0;
+        results.forEach((coverage) => {
+            coverage.forEach((r) => {
+                if (!byOp[r.operator]) {
+                    byOp[r.operator] = { operator: r.operator, operator_name: r.operator_name, covKm: 0, totalKm: 0 };
+                }
+                byOp[r.operator].covKm += r.covered_length_km;
+                byOp[r.operator].totalKm += r.total_length_km;
+            });
         });
-        const coverage = await res.json();
-        displayRouteResults(coverage, resultsDiv);
-        if (coverage.length > 0) updateRouteCoverageChart(coverage);
+
+        const merged = Object.values(byOp).map((r) => ({
+            operator: r.operator,
+            operator_name: r.operator_name,
+            total_length_km: Math.round(r.totalKm * 10) / 10,
+            covered_length_km: Math.round(r.covKm * 10) / 10,
+            coverage_pct: Math.round((r.covKm / (r.totalKm || 1)) * 1000) / 10,
+        }));
+        merged.sort((a, b) => b.coverage_pct - a.coverage_pct);
+
+        displayRouteResults(merged, resultsDiv);
+        if (merged.length > 0) updateRouteCoverageChart(merged);
     } catch (err) {
         console.error("Route analysis error:", err);
         const errEl = document.createElement("div");
@@ -496,6 +636,8 @@ function clearRoute() {
     _route.departure = null;
     _route.arrival = null;
     _route.selectedLineId = null;
+    _route.transferLineId = null;
+    _route.arrLineId = null;
 
     document.querySelectorAll(".station-input").forEach((input) => { input.value = ""; });
     document.getElementById("selected-line-info").style.display = "none";

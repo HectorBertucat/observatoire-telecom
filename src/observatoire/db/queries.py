@@ -633,6 +633,56 @@ def get_route_geojson(
     return {"type": "FeatureCollection", "features": [feature]}
 
 
+def find_transfer_lines(
+    conn: duckdb.DuckDBPyConnection,
+    dep_line_ids: list[str],
+    arr_line_ids: list[str],
+    proximity_m: float = 500,
+) -> list[dict[str, Any]]:
+    """Trouve les lignes de correspondance entre deux groupes de lignes.
+
+    Utilise la proximite geometrique (ST_DWithin) pour determiner quelles
+    lignes intersectent a la fois une ligne depart et une ligne arrivee.
+    """
+    if not dep_line_ids or not arr_line_ids:
+        return []
+
+    dep_placeholders = ", ".join(["?"] * len(dep_line_ids))
+    arr_placeholders = ", ".join(["?"] * len(arr_line_ids))
+
+    result = conn.execute(
+        f"""
+        WITH dep_neighbors AS (
+            SELECT DISTINCT l2.line_id, l2.line_name, l2.length_km
+            FROM ref_railway_lines l1
+            JOIN ref_railway_lines l2
+                ON l1.line_id != l2.line_id
+                AND ST_DWithin(l1.geometry, l2.geometry, ?)
+            WHERE l1.line_id IN ({dep_placeholders})
+        ),
+        arr_neighbors AS (
+            SELECT DISTINCT l2.line_id
+            FROM ref_railway_lines l1
+            JOIN ref_railway_lines l2
+                ON l1.line_id != l2.line_id
+                AND ST_DWithin(l1.geometry, l2.geometry, ?)
+            WHERE l1.line_id IN ({arr_placeholders})
+        )
+        SELECT d.line_id, d.line_name, ROUND(d.length_km, 1) AS length_km
+        FROM dep_neighbors d
+        JOIN arr_neighbors a ON d.line_id = a.line_id
+        WHERE d.line_id NOT IN ({dep_placeholders})
+          AND d.line_id NOT IN ({arr_placeholders})
+        ORDER BY d.length_km DESC
+        LIMIT 5
+        """,
+        [proximity_m, *dep_line_ids, proximity_m, *arr_line_ids, *dep_line_ids, *arr_line_ids],
+    ).fetchall()
+
+    columns = ["line_id", "line_name", "length_km"]
+    return [dict(zip(columns, row, strict=True)) for row in result]
+
+
 def populate_simplified_coverage(conn: duckdb.DuckDBPyConnection) -> int:
     """Pre-calcule les couvertures simplifiees pour les analyses spatiales.
 

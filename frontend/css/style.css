@@ -312,6 +312,39 @@ header h1 {
     margin-top: 2px;
 }
 
+/* === TRANSFER OPTIONS === */
+.transfer-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    margin-bottom: 4px;
+    transition: all 0.15s;
+}
+
+.transfer-option:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.transfer-option.selected {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.transfer-km {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
 /* === MAIN CONTENT === */
 .main-content {
     flex: 1;

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from observatoire.api.deps import get_db
 from observatoire.api.schemas.routes import RouteCoverageRequest
 from observatoire.db.queries import (
+    find_transfer_lines,
     get_railway_lines,
     get_railway_stations,
     get_route_coverage,
@@ -51,6 +52,22 @@ async def route_coverage(
     de couverture ARCEP.
     """
     return get_route_coverage(db, body.line_id, body.technology, body.buffer_km)
+
+
+@router.get("/transfers")
+async def transfer_lines(
+    db: DB,
+    dep_lines: str = Query(..., description="Codes lignes depart (virgule)"),
+    arr_lines: str = Query(..., description="Codes lignes arrivee (virgule)"),
+) -> list[dict[str, Any]]:
+    """Trouve les lignes de correspondance entre depart et arrivee.
+
+    Utilise la proximite geometrique des traces pour trouver les lignes
+    qui connectent les reseaux depart et arrivee.
+    """
+    dep = [c.strip() for c in dep_lines.split(",") if c.strip()]
+    arr = [c.strip() for c in arr_lines.split(",") if c.strip()]
+    return find_transfer_lines(db, dep, arr)
 
 
 @router.get("/lines/{line_id}/geojson")
