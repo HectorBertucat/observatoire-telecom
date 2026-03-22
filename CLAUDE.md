@@ -46,6 +46,7 @@ en France, basé sur les données ouvertes ARCEP/ANFR. Side-project data enginee
 - `make format` : formater le code automatiquement
 - `make mcp` : lancer le serveur MCP
 - `make seed` : générer des données de test (sans téléchargement)
+- `make sncf` : télécharger et charger les données SNCF (lignes RFN + gares)
 - `make tiles` : régénérer les vector tiles PMTiles
 - `uv run python scripts/run_full_pipeline.py [operators...]` : pipeline d'ingestion complète
 
@@ -70,9 +71,11 @@ en France, basé sur les données ouvertes ARCEP/ANFR. Side-project data enginee
   - Systèmes : GSM%=2G, UMTS%=3G, LTE%=4G, 5G NR%=5G
 - **ref_communes** : 34 955 communes avec codes INSEE et noms
 - **mart_coverage_by_commune** : 197k lignes (antennes par commune/opérateur/techno)
+- **ref_railway_lines** : lignes ferroviaires RFN (SNCF Open Data, Lambert-93)
+- **ref_railway_stations** : gares voyageurs (SNCF Open Data, WGS84)
 - **PMTiles** : coverage.pmtiles (71 MB, z4-z12) + antennas.pmtiles (18 MB, z7-z14)
-- **5 MCP tools** : get_antenna_count, compare_operators, get_coverage_summary,
-  search_antennas, find_nearby_antennas
+- **6 MCP tools** : get_antenna_count, compare_operators, get_coverage_summary,
+  search_antennas, find_nearby_antennas, analyze_route_coverage
 
 ## Règles de sécurité
 - Ne jamais commiter de clés API dans le code

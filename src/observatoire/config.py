@@ -22,6 +22,16 @@ class Settings(BaseSettings):
     # ANFR
     anfr_base_url: str = "https://data.anfr.fr/api"
 
+    # SNCF Open Data
+    sncf_lines_url: str = (
+        "https://ressources.data.sncf.com/api/explore/v2.1/catalog/datasets/"
+        "formes-des-lignes-du-rfn/exports/geojson"
+    )
+    sncf_stations_url: str = (
+        "https://ressources.data.sncf.com/api/explore/v2.1/catalog/datasets/"
+        "liste-des-gares/exports/geojson"
+    )
+
     # Anthropic (pour l'agent, Phase 5)
     anthropic_api_key: str = ""
 

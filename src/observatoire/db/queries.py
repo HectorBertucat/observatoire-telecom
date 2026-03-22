@@ -427,6 +427,237 @@ def get_top_communes(
     return [dict(zip(columns, row, strict=True)) for row in result]
 
 
+def get_railway_lines(
+    conn: duckdb.DuckDBPyConnection,
+    search: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Retourne la liste des lignes ferroviaires (sans geometrie)."""
+    conditions: list[str] = []
+    params: list[Any] = []
+
+    if search:
+        conditions.append("(LOWER(line_name) LIKE ? OR line_id LIKE ?)")
+        pattern = f"%{search.lower()}%"
+        params.extend([pattern, f"%{search}%"])
+
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    params.append(limit)
+
+    result = conn.execute(
+        f"""
+        SELECT line_id, line_name, ROUND(length_km, 1) AS length_km
+        FROM ref_railway_lines
+        {where}
+        ORDER BY line_name
+        LIMIT ?
+        """,
+        params,
+    ).fetchall()
+
+    columns = ["line_id", "line_name", "length_km"]
+    return [dict(zip(columns, row, strict=True)) for row in result]
+
+
+def get_railway_stations(
+    conn: duckdb.DuckDBPyConnection,
+    search: str | None = None,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Retourne la liste des gares (pour autocomplete).
+
+    Deduplication par nom de gare : une gare peut apparaitre sur
+    plusieurs lignes, on retourne une seule entree par nom avec
+    la liste des codes ligne.
+    """
+    conditions: list[str] = []
+    params: list[Any] = []
+
+    if search:
+        conditions.append("LOWER(station_name) LIKE ?")
+        params.append(f"%{search.lower()}%")
+
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    params.append(limit)
+
+    result = conn.execute(
+        f"""
+        SELECT
+            MIN(station_id) AS station_id,
+            station_name,
+            STRING_AGG(DISTINCT line_code, ',') AS line_codes,
+            MIN(commune) AS commune,
+            MIN(department) AS department,
+            ROUND(AVG(latitude), 6) AS latitude,
+            ROUND(AVG(longitude), 6) AS longitude
+        FROM ref_railway_stations
+        {where}
+        GROUP BY station_name
+        ORDER BY station_name
+        LIMIT ?
+        """,
+        params,
+    ).fetchall()
+
+    columns = [
+        "station_id",
+        "station_name",
+        "line_codes",
+        "commune",
+        "department",
+        "latitude",
+        "longitude",
+    ]
+    return [dict(zip(columns, row, strict=True)) for row in result]
+
+
+def get_route_coverage(
+    conn: duckdb.DuckDBPyConnection,
+    line_id: str,
+    technology: str = "4G",
+    buffer_km: float = 2.0,
+) -> list[dict[str, Any]]:
+    """Calcule la couverture reseau le long d'une ligne ferroviaire.
+
+    Algorithme :
+    1. Recuperer la geometrie de la ligne (Lambert-93)
+    2. Creer un buffer de N km autour du trace
+    3. Intersecter avec raw_coverage pour chaque operateur
+    4. Calculer le % de longueur couverte
+    """
+    buffer_m = buffer_km * 1000
+
+    # Utilise stg_coverage_simplified (pre-calcule) pour des requetes
+    # rapides. Filtre par bounding box pre-stocke, puis intersection
+    # avec les geometries simplifiees.
+    result = conn.execute(
+        """
+        WITH line AS (
+            SELECT geometry, length_km
+            FROM ref_railway_lines
+            WHERE line_id = ?
+            LIMIT 1
+        ),
+        candidates AS (
+            SELECT sc.operator_code,
+                   sc.geometry,
+                   ro.name AS operator_name
+            FROM stg_coverage_simplified sc
+            LEFT JOIN ref_operators ro ON sc.operator_code = ro.code,
+                 line l
+            WHERE sc.technology = ?
+              AND sc.bbox_xmax >= ST_XMin(l.geometry) - ?
+              AND sc.bbox_xmin <= ST_XMax(l.geometry) + ?
+              AND sc.bbox_ymax >= ST_YMin(l.geometry) - ?
+              AND sc.bbox_ymin <= ST_YMax(l.geometry) + ?
+        ),
+        coverage_intersection AS (
+            SELECT
+                c.operator_code,
+                c.operator_name,
+                l.length_km AS total_length_km,
+                ST_Length(ST_Intersection(l.geometry, c.geometry))
+                    / 1000.0 AS covered_length_km
+            FROM line l
+            CROSS JOIN candidates c
+            WHERE ST_Intersects(l.geometry, c.geometry)
+        )
+        SELECT
+            operator_code,
+            operator_name,
+            MAX(total_length_km) AS total_length_km,
+            ROUND(
+                LEAST(SUM(covered_length_km), MAX(total_length_km)), 1
+            ) AS covered_length_km,
+            ROUND(
+                LEAST(
+                    SUM(covered_length_km)
+                    / NULLIF(MAX(total_length_km), 0) * 100,
+                    100
+                ),
+                1
+            ) AS coverage_pct
+        FROM coverage_intersection
+        GROUP BY operator_code, operator_name
+        ORDER BY coverage_pct DESC
+        """,
+        [line_id, technology, buffer_m, buffer_m, buffer_m, buffer_m],
+    ).fetchall()
+
+    columns = [
+        "operator",
+        "operator_name",
+        "total_length_km",
+        "covered_length_km",
+        "coverage_pct",
+    ]
+    return [dict(zip(columns, row, strict=True)) for row in result]
+
+
+def get_route_geojson(
+    conn: duckdb.DuckDBPyConnection,
+    line_id: str,
+) -> dict[str, Any]:
+    """Retourne le GeoJSON d'une ligne ferroviaire (WGS84)."""
+    result = conn.execute(
+        """
+        SELECT
+            ST_AsGeoJSON(
+                ST_FlipCoordinates(
+                    ST_Transform(geometry, 'EPSG:2154', 'EPSG:4326')
+                )
+            ) AS geojson,
+            line_id,
+            line_name,
+            ROUND(length_km, 1) AS length_km
+        FROM ref_railway_lines
+        WHERE line_id = ?
+        LIMIT 1
+        """,
+        [line_id],
+    ).fetchone()
+
+    if not result:
+        return {"type": "FeatureCollection", "features": []}
+
+    geom = json.loads(result[0])
+    feature: dict[str, Any] = {
+        "type": "Feature",
+        "geometry": geom,
+        "properties": {
+            "line_id": result[1],
+            "line_name": result[2],
+            "length_km": result[3],
+        },
+    }
+    return {"type": "FeatureCollection", "features": [feature]}
+
+
+def populate_simplified_coverage(conn: duckdb.DuckDBPyConnection) -> int:
+    """Pre-calcule les couvertures simplifiees pour les analyses spatiales.
+
+    Simplifie les geometries (tolerance 5km en Lambert-93) et stocke
+    les bounding boxes pour permettre un filtrage rapide.
+    """
+    conn.execute("DELETE FROM stg_coverage_simplified")
+    conn.execute("""
+        INSERT INTO stg_coverage_simplified
+            (operator_code, technology, geometry,
+             bbox_xmin, bbox_ymin, bbox_xmax, bbox_ymax)
+        SELECT
+            operator_code,
+            technology,
+            ST_Simplify(geometry, 5000),
+            ST_XMin(geometry),
+            ST_YMin(geometry),
+            ST_XMax(geometry),
+            ST_YMax(geometry)
+        FROM raw_coverage
+    """)
+    count: int = conn.execute("SELECT COUNT(*) FROM stg_coverage_simplified").fetchone()[0]  # type: ignore[index]
+    return count
+
+
 def get_table_counts(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
     """Retourne le nombre de lignes par table."""
     tables = [row[0] for row in conn.execute("SHOW TABLES").fetchall()]

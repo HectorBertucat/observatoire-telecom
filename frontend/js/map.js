@@ -274,6 +274,68 @@ function filterTechnologyOnMap(tech) {
     }
 }
 
+/* === ROUTE LINE DISPLAY === */
+function drawRouteLine(geojson) {
+    // Supprimer la couche precedente si elle existe
+    if (map.getLayer("route-line")) map.removeLayer("route-line");
+    if (map.getLayer("route-line-border")) map.removeLayer("route-line-border");
+    if (map.getSource("route")) map.removeSource("route");
+
+    if (!geojson || !geojson.features || geojson.features.length === 0) return;
+
+    map.addSource("route", { type: "geojson", data: geojson });
+
+    // Bordure (plus large, sombre)
+    map.addLayer({
+        id: "route-line-border",
+        type: "line",
+        source: "route",
+        paint: {
+            "line-color": "#0f172a",
+            "line-width": 6,
+            "line-opacity": 0.8,
+        },
+    }, "labels");
+
+    // Ligne principale (jaune/or)
+    map.addLayer({
+        id: "route-line",
+        type: "line",
+        source: "route",
+        paint: {
+            "line-color": "#facc15",
+            "line-width": 3,
+            "line-opacity": 0.9,
+        },
+    }, "labels");
+
+    // Zoom sur la ligne
+    const coords = [];
+    geojson.features.forEach((f) => {
+        const geom = f.geometry;
+        if (geom.type === "LineString") {
+            coords.push(...geom.coordinates);
+        } else if (geom.type === "MultiLineString") {
+            geom.coordinates.forEach((line) => coords.push(...line));
+        }
+    });
+
+    if (coords.length > 0) {
+        const lngs = coords.map((c) => c[0]);
+        const lats = coords.map((c) => c[1]);
+        map.fitBounds(
+            [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+            { padding: 60, duration: 1.5 }
+        );
+    }
+}
+
+function clearRouteLine() {
+    if (map.getLayer("route-line")) map.removeLayer("route-line");
+    if (map.getLayer("route-line-border")) map.removeLayer("route-line-border");
+    if (map.getSource("route")) map.removeSource("route");
+}
+
 /* === ZOOM INDICATOR === */
 map.on("zoomend", () => {
     const el = document.getElementById("zoom-indicator");

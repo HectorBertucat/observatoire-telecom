@@ -57,6 +57,35 @@
 
             <hr class="panel-divider">
 
+            <!-- Trajet ferroviaire -->
+            <div class="panel-section">
+                <div class="panel-section-title">Trajet ferroviaire</div>
+                <div class="autocomplete-wrapper" data-role="departure">
+                    <input type="text" class="panel-input station-input"
+                        placeholder="Gare de depart..." autocomplete="off">
+                    <div class="autocomplete-dropdown"></div>
+                </div>
+                <div class="autocomplete-wrapper" data-role="arrival" style="margin-top:6px">
+                    <input type="text" class="panel-input station-input"
+                        placeholder="Gare d'arrivee..." autocomplete="off">
+                    <div class="autocomplete-dropdown"></div>
+                </div>
+                <div id="selected-line-info" class="route-line-info" style="display:none"></div>
+                <div style="display:flex;gap:6px;margin-top:8px">
+                    <select id="route-tech-select" class="panel-select" style="flex:1">
+                        <option value="4G" selected>4G</option>
+                        <option value="3G">3G</option>
+                        <option value="2G">2G</option>
+                    </select>
+                    <button onclick="analyzeRoute()" class="btn btn-primary btn-sm" id="btn-analyze-route" disabled>Analyser</button>
+                </div>
+                <div class="panel-hint">L'ARCEP ne publie pas la couverture 5G theorique. Seules les antennes 5G sont visibles sur la carte.</div>
+                <div id="route-results" style="margin-top:8px"></div>
+                <button onclick="clearRoute()" class="btn btn-ghost btn-sm" id="btn-clear-route" style="display:none;margin-top:6px;width:100%">Effacer le trajet</button>
+            </div>
+
+            <hr class="panel-divider">
+
             <!-- Quick stats -->
             <div class="panel-section">
                 <div class="panel-section-title">Chiffres cles</div>
@@ -104,6 +133,10 @@
                 <div class="chart-card" style="flex:1">
                     <div class="chart-title" id="top-communes-title">Top 10 communes</div>
                     <canvas id="top-communes-chart"></canvas>
+                </div>
+                <div class="chart-card" id="route-chart-card" style="flex:1;display:none">
+                    <div class="chart-title">Couverture le long du trajet</div>
+                    <canvas id="route-coverage-chart"></canvas>
                 </div>
             </div>
         </div>

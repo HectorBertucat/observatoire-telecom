@@ -176,6 +176,48 @@ def register_tools(mcp: FastMCP) -> None:
         return "\n".join(lines)
 
     @mcp.tool()
+    def analyze_route_coverage(
+        line_id: str,
+        technology: str = "4G",
+        buffer_km: float = 2.0,
+    ) -> str:
+        """Analyse la couverture reseau le long d'une ligne ferroviaire SNCF.
+
+        Calcule le pourcentage de couverture par operateur en creant un buffer
+        autour du trace et en l'intersectant avec les polygones ARCEP.
+
+        Args:
+            line_id: Identifiant de la ligne RFN (ex: "001000")
+            technology: Technologie reseau (2G, 3G, 4G)
+            buffer_km: Rayon du buffer autour du trace en km (defaut: 2km)
+        """
+        from observatoire.db.queries import get_route_coverage
+
+        with db_session(read_only=True) as conn:
+            results = get_route_coverage(conn, line_id, technology, buffer_km)
+
+        if not results:
+            return (
+                f"Aucune donnee de couverture {technology} trouvee "
+                f"pour la ligne {line_id} (buffer {buffer_km}km)."
+            )
+
+        first = results[0]
+        total_km = first.get("total_length_km", 0)
+        lines = [
+            f"Couverture {technology} le long de la ligne {line_id} "
+            f"({total_km:.0f} km, buffer {buffer_km}km):\n"
+        ]
+
+        for i, r in enumerate(results, 1):
+            name = r.get("operator_name") or r["operator"]
+            pct = r["coverage_pct"]
+            covered = r["covered_length_km"]
+            lines.append(f"  {i}. {name}: {pct:.1f}% ({covered:.0f} km couverts)")
+
+        return "\n".join(lines)
+
+    @mcp.tool()
     def search_antennas(
         commune_code: str,
         technology: str = "4G",

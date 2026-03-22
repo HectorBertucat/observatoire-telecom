@@ -18,6 +18,7 @@ const TECH_COLORS = {
 let antennasChart = null;
 let techChart = null;
 let topCommunesChart = null;
+let routeCoverageChart = null;
 
 /* === Horizontal stacked bar: antennes par opérateur × techno === */
 function updateAntennasChart(data) {
@@ -157,6 +158,66 @@ function updateTopCommunesChart(communes, deptCode) {
                 tooltip: {
                     callbacks: {
                         label: (c) => `${c.raw.toLocaleString("fr-FR")} antennes`,
+                    },
+                },
+            },
+        },
+    });
+}
+
+/* === Route coverage horizontal bar === */
+function updateRouteCoverageChart(data) {
+    const card = document.getElementById("route-chart-card");
+    const ctx = document.getElementById("route-coverage-chart");
+    if (!ctx) return;
+    if (routeCoverageChart) routeCoverageChart.destroy();
+
+    if (!data || data.length === 0) {
+        if (card) card.style.display = "none";
+        return;
+    }
+
+    if (card) card.style.display = "block";
+
+    const labels = data.map((d) => CHART_NAMES[d.operator] || d.operator_name || d.operator);
+    const values = data.map((d) => d.coverage_pct);
+    const colors = data.map((d) => CHART_COLORS[d.operator] || "#666");
+
+    routeCoverageChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderRadius: 2,
+                borderSkipped: false,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            scales: {
+                x: {
+                    min: 0,
+                    max: 100,
+                    grid: { color: "rgba(255,255,255,0.03)" },
+                    ticks: { callback: (v) => `${v}%` },
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11 } },
+                },
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (c) => {
+                            const d = data[c.dataIndex];
+                            return `${c.raw}% (${d.covered_length_km} km / ${d.total_length_km} km)`;
+                        },
                     },
                 },
             },

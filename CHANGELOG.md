@@ -8,6 +8,17 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Added
+- **Phase 2 — Trajets SNCF** : analyse de couverture le long des lignes ferroviaires
+  - Pipeline ingestion SNCF : téléchargement GeoJSON lignes RFN + gares depuis SNCF Open Data
+  - Tables DuckDB : `ref_railway_lines` (lignes en Lambert-93), `ref_railway_stations` (gares)
+  - API REST : `GET /routes/lines`, `GET /routes/stations`, `POST /routes/coverage`, `GET /routes/lines/{id}/geojson`
+  - Algorithme couverture : buffer 2km autour du tracé → intersection avec `raw_coverage` → % par opérateur
+  - MCP tool `analyze_route_coverage` : analyse couverture par ligne RFN
+  - Frontend : panneau "Trajet ferroviaire" avec recherche de ligne, sélection techno, analyse
+  - Carte : tracé de la ligne en jaune/or avec zoom automatique
+  - Chart : couverture par opérateur le long du trajet (barre horizontale)
+  - Script `load_sncf_data.py` + cible Makefile `make sncf`
+  - 11 nouveaux tests (schema, API, ingestion) — 45 tests total
 - 2G ARCEP coverage (2024_T4, 4 opérateurs, 1147 géométries)
 - Référentiel communes INSEE (34 955 communes avec noms)
 - mart_coverage_by_commune peuplé (197k lignes, antennes par commune)

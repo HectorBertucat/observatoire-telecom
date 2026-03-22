@@ -1,4 +1,4 @@
-.PHONY: help pipeline ingest serve test lint format mcp seed tiles clean
+.PHONY: help pipeline ingest serve test lint format mcp seed tiles sncf clean
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -31,6 +31,9 @@ mcp: ## Lance le serveur MCP
 
 seed: ## Génère des données de test (sans téléchargement)
 	uv run python scripts/seed_sample_data.py
+
+sncf: ## Télécharge et charge les données SNCF (lignes RFN + gares)
+	uv run python scripts/load_sncf_data.py
 
 tiles: ## Régénère les vector tiles PMTiles
 	uv run python scripts/generate_tiles.py

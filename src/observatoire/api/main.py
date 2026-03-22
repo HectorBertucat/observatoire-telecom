@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from observatoire.api.routers import antennas, coverage, stats
+from observatoire.api.routers import antennas, coverage, routes, stats
 from observatoire.api.schemas.common import HealthResponse
 from observatoire.db.connection import get_connection
 from observatoire.db.schema import create_schema, seed_reference_data
@@ -27,6 +27,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     conn = get_connection(read_only=False)
     create_schema(conn)
     seed_reference_data(conn)
+    # Peupler la table de couverture simplifiée si vide
+    count = conn.execute("SELECT COUNT(*) FROM stg_coverage_simplified").fetchone()[0]  # type: ignore[index]
+    if count == 0:
+        from observatoire.db.queries import populate_simplified_coverage
+
+        raw_count = conn.execute("SELECT COUNT(*) FROM raw_coverage").fetchone()[0]  # type: ignore[index]
+        if raw_count > 0:
+            logger.info("Calcul des couvertures simplifiées...")
+            populate_simplified_coverage(conn)
     tables = conn.execute("SHOW TABLES").fetchall()
     conn.close()
     logger.info(f"Base DuckDB connectée ({len(tables)} tables)")
@@ -45,6 +54,7 @@ app = FastAPI(
 app.include_router(coverage.router, prefix="/api/v1/coverage", tags=["Couverture"])
 app.include_router(antennas.router, prefix="/api/v1/antennas", tags=["Antennes"])
 app.include_router(stats.router, prefix="/api/v1/stats", tags=["Statistiques"])
+app.include_router(routes.router, prefix="/api/v1/routes", tags=["Trajets"])
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Système"])

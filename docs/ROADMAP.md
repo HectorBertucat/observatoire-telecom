@@ -43,11 +43,11 @@
 
 ### Etapes
 
-- [ ] Telecharger + charger les lignes RFN dans DuckDB
-- [ ] Telecharger les gares (pour autocomplete depart/arrivee)
-- [ ] API endpoint couverture le long d'une ligne
-- [ ] Frontend panneau trajet
-- [ ] Tests
+- [x] Telecharger + charger les lignes RFN dans DuckDB
+- [x] Telecharger les gares (pour autocomplete depart/arrivee)
+- [x] API endpoint couverture le long d'une ligne
+- [x] Frontend panneau trajet
+- [x] Tests (11 nouveaux, 45 total)
 
 ## Phase 3 — Donnees de couverture reelle (crowdsourced)
 

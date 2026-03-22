@@ -58,6 +58,45 @@ def create_schema(conn: duckdb.DuckDBPyConnection) -> None:
         )
     """)
 
+    # Lignes ferroviaires RFN (SNCF Open Data)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ref_railway_lines (
+            line_id VARCHAR,
+            line_name VARCHAR,
+            geometry GEOMETRY,
+            length_km DOUBLE,
+            ingested_at TIMESTAMP DEFAULT current_timestamp
+        )
+    """)
+
+    # Gares voyageurs (SNCF Open Data)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ref_railway_stations (
+            station_id VARCHAR,
+            station_name VARCHAR,
+            line_code VARCHAR,
+            commune VARCHAR,
+            department VARCHAR,
+            latitude DOUBLE,
+            longitude DOUBLE,
+            geometry GEOMETRY,
+            ingested_at TIMESTAMP DEFAULT current_timestamp
+        )
+    """)
+
+    # Couverture simplifiée (pré-calculée pour les analyses spatiales rapides)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS stg_coverage_simplified (
+            operator_code VARCHAR NOT NULL,
+            technology VARCHAR NOT NULL,
+            geometry GEOMETRY,
+            bbox_xmin DOUBLE,
+            bbox_ymin DOUBLE,
+            bbox_xmax DOUBLE,
+            bbox_ymax DOUBLE
+        )
+    """)
+
     # Table agrégée : couverture par commune
     conn.execute("""
         CREATE TABLE IF NOT EXISTS mart_coverage_by_commune (

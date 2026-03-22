@@ -232,3 +232,281 @@ function exportCSV() {
     if (dept) params.set("department", dept);
     window.open(`${API_BASE}/antennas/export.csv?${params.toString()}`, "_blank");
 }
+
+/* === TRAJET FERROVIAIRE === */
+
+// Etat des deux gares selectionnees
+const _route = {
+    departure: null, // { station_name, line_codes, latitude, longitude, ... }
+    arrival: null,
+    selectedLineId: null,
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Initialiser les deux autocompletes
+    document.querySelectorAll(".autocomplete-wrapper").forEach((wrapper) => {
+        const role = wrapper.dataset.role; // "departure" ou "arrival"
+        if (!role) return;
+        initStationAutocomplete(wrapper, role);
+    });
+
+    // Fermer tous les dropdowns si on clique ailleurs
+    document.addEventListener("click", (e) => {
+        if (!e.target.closest(".autocomplete-wrapper")) {
+            document.querySelectorAll(".autocomplete-dropdown").forEach((d) => {
+                d.classList.remove("visible");
+            });
+        }
+    });
+});
+
+function initStationAutocomplete(wrapper, role) {
+    const input = wrapper.querySelector(".station-input");
+    const dropdown = wrapper.querySelector(".autocomplete-dropdown");
+    let timeout = null;
+    let activeIdx = -1;
+
+    input.addEventListener("input", () => {
+        activeIdx = -1;
+        const query = input.value.trim();
+        if (query.length < 2) {
+            dropdown.classList.remove("visible");
+            return;
+        }
+        clearTimeout(timeout);
+        timeout = setTimeout(async () => {
+            try {
+                const res = await fetch(
+                    `${API_BASE}/routes/stations?search=${encodeURIComponent(query)}&limit=12`
+                );
+                const stations = await res.json();
+                renderDropdown(dropdown, stations, role);
+            } catch (err) {
+                console.error("Station search error:", err);
+            }
+        }, 200);
+    });
+
+    input.addEventListener("keydown", (e) => {
+        const items = dropdown.querySelectorAll(".autocomplete-item");
+        if (!items.length) return;
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            activeIdx = Math.min(activeIdx + 1, items.length - 1);
+            highlightItem(items, activeIdx);
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            activeIdx = Math.max(activeIdx - 1, 0);
+            highlightItem(items, activeIdx);
+        } else if (e.key === "Enter" && activeIdx >= 0) {
+            e.preventDefault();
+            items[activeIdx].click();
+        } else if (e.key === "Escape") {
+            dropdown.classList.remove("visible");
+        }
+    });
+}
+
+function highlightItem(items, idx) {
+    items.forEach((item, i) => item.classList.toggle("active", i === idx));
+    if (idx >= 0 && items[idx]) items[idx].scrollIntoView({ block: "nearest" });
+}
+
+function renderDropdown(dropdown, stations, role) {
+    while (dropdown.firstChild) dropdown.removeChild(dropdown.firstChild);
+
+    if (stations.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "autocomplete-item";
+        empty.style.color = "var(--text-muted)";
+        empty.textContent = "Aucune gare trouvee";
+        dropdown.appendChild(empty);
+        dropdown.classList.add("visible");
+        return;
+    }
+
+    stations.forEach((station) => {
+        const item = document.createElement("div");
+        item.className = "autocomplete-item";
+
+        const name = document.createElement("div");
+        name.className = "autocomplete-item-name";
+        name.textContent = station.station_name;
+
+        const detail = document.createElement("div");
+        detail.className = "autocomplete-item-detail";
+        detail.textContent = `${station.commune || ""} (${station.department || ""})`;
+
+        item.appendChild(name);
+        item.appendChild(detail);
+        item.addEventListener("click", () => onStationSelected(station, role));
+        dropdown.appendChild(item);
+    });
+
+    dropdown.classList.add("visible");
+}
+
+function onStationSelected(station, role) {
+    // Mettre a jour l'input
+    const wrapper = document.querySelector(`.autocomplete-wrapper[data-role="${role}"]`);
+    const input = wrapper.querySelector(".station-input");
+    const dropdown = wrapper.querySelector(".autocomplete-dropdown");
+    input.value = station.station_name;
+    dropdown.classList.remove("visible");
+
+    // Stocker la selection
+    _route[role] = station;
+
+    // Si les deux gares sont selectionnees, trouver la ligne commune
+    if (_route.departure && _route.arrival) {
+        findAndShowRoute();
+    } else if (_route.departure) {
+        // Zoom sur la gare de depart
+        if (station.latitude && station.longitude) {
+            map.flyTo({ center: [station.longitude, station.latitude], zoom: 8, duration: 1 });
+        }
+    }
+}
+
+async function findAndShowRoute() {
+    const dep = _route.departure;
+    const arr = _route.arrival;
+    const depLines = (dep.line_codes || "").split(",").filter(Boolean);
+    const arrLines = (arr.line_codes || "").split(",").filter(Boolean);
+
+    // Chercher une ligne en commun
+    const common = depLines.filter((l) => arrLines.includes(l));
+    const lineId = common.length > 0 ? common[0] : depLines[0];
+
+    _route.selectedLineId = lineId;
+    const btn = document.getElementById("btn-analyze-route");
+    btn.disabled = false;
+    document.getElementById("btn-clear-route").style.display = "block";
+
+    try {
+        const [geojsonRes, linesRes] = await Promise.all([
+            fetch(`${API_BASE}/routes/lines/${lineId}/geojson`),
+            fetch(`${API_BASE}/routes/lines?search=${lineId}&limit=1`),
+        ]);
+        const geojson = await geojsonRes.json();
+        const lines = await linesRes.json();
+
+        // Afficher la ligne sur la carte
+        if (typeof drawRouteLine === "function") drawRouteLine(geojson);
+
+        // Afficher les infos
+        const infoDiv = document.getElementById("selected-line-info");
+        while (infoDiv.firstChild) infoDiv.removeChild(infoDiv.firstChild);
+
+        const lineInfo = lines[0] || {};
+        const lineName = document.createElement("div");
+        lineName.className = "line-name";
+        lineName.textContent = `${dep.station_name} → ${arr.station_name}`;
+        infoDiv.appendChild(lineName);
+
+        const lineDetail = document.createElement("div");
+        lineDetail.className = "line-detail";
+        const label = common.length > 0 ? "ligne directe" : "ligne depart";
+        lineDetail.textContent = `${lineInfo.length_km || "?"} km — ${label} ${lineId}`;
+        infoDiv.appendChild(lineDetail);
+
+        infoDiv.style.display = "block";
+    } catch (err) {
+        console.error("Find route error:", err);
+    }
+}
+
+async function analyzeRoute() {
+    if (!_route.selectedLineId) return;
+
+    const tech = document.getElementById("route-tech-select").value;
+    const resultsDiv = document.getElementById("route-results");
+    const btn = document.getElementById("btn-analyze-route");
+
+    btn.disabled = true;
+    btn.textContent = "...";
+    while (resultsDiv.firstChild) resultsDiv.removeChild(resultsDiv.firstChild);
+
+    try {
+        const res = await fetch(`${API_BASE}/routes/coverage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ line_id: _route.selectedLineId, technology: tech }),
+        });
+        const coverage = await res.json();
+        displayRouteResults(coverage, resultsDiv);
+        if (coverage.length > 0) updateRouteCoverageChart(coverage);
+    } catch (err) {
+        console.error("Route analysis error:", err);
+        const errEl = document.createElement("div");
+        errEl.className = "panel-hint";
+        errEl.textContent = "Erreur lors de l'analyse.";
+        resultsDiv.appendChild(errEl);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Analyser";
+    }
+}
+
+function displayRouteResults(coverage, container) {
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    if (coverage.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "panel-hint";
+        empty.textContent = "Aucune donnee de couverture pour cette ligne.";
+        container.appendChild(empty);
+        return;
+    }
+
+    coverage.forEach((r) => {
+        const row = document.createElement("div");
+        row.className = "stat-mini";
+
+        const label = document.createElement("span");
+        label.className = "stat-mini-label";
+        const opInfo = APP_OPERATORS[r.operator];
+        if (opInfo) {
+            const dot = document.createElement("span");
+            dot.style.cssText = `display:inline-block;width:8px;height:8px;border-radius:50%;background:${opInfo.color};margin-right:6px`;
+            label.appendChild(dot);
+        }
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = r.operator_name || r.operator;
+        label.appendChild(nameSpan);
+
+        const value = document.createElement("span");
+        value.className = "stat-mini-value";
+        value.textContent = `${r.coverage_pct}%`;
+
+        row.appendChild(label);
+        row.appendChild(value);
+        container.appendChild(row);
+    });
+
+    const detail = document.createElement("div");
+    detail.className = "panel-hint";
+    const totalKm = coverage[0].total_length_km;
+    detail.textContent = `Longueur : ${totalKm} km`;
+    container.appendChild(detail);
+}
+
+function clearRoute() {
+    _route.departure = null;
+    _route.arrival = null;
+    _route.selectedLineId = null;
+
+    document.querySelectorAll(".station-input").forEach((input) => { input.value = ""; });
+    document.getElementById("selected-line-info").style.display = "none";
+    document.getElementById("btn-analyze-route").disabled = true;
+    document.getElementById("btn-clear-route").style.display = "none";
+
+    const resultsDiv = document.getElementById("route-results");
+    while (resultsDiv.firstChild) resultsDiv.removeChild(resultsDiv.firstChild);
+
+    const card = document.getElementById("route-chart-card");
+    if (card) card.style.display = "none";
+
+    if (typeof clearRouteLine === "function") clearRouteLine();
+}

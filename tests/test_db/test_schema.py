@@ -13,7 +13,10 @@ def test_create_schema_creates_all_tables(db_conn):
         "raw_antenna_sites",
         "raw_coverage",
         "ref_operators",
+        "ref_railway_lines",
+        "ref_railway_stations",
         "ref_technologies",
+        "stg_coverage_simplified",
     ]
     assert sorted(tables) == expected
 
@@ -24,7 +27,7 @@ def test_create_schema_is_idempotent(db_conn):
     create_schema(db_conn)
 
     tables = [row[0] for row in db_conn.execute("SHOW TABLES").fetchall()]
-    assert len(tables) == 5
+    assert len(tables) == 8
 
 
 def test_seed_reference_data(db_conn):
