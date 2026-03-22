@@ -695,8 +695,12 @@ def find_transfer_options(
                 ) AS transfer_station
             FROM bridge b
         )
-        SELECT line_id, line_name, length_km, transfer_station
-        FROM bridge_with_station
+        SELECT line_id, line_name, length_km, transfer_station,
+               (SELECT s.latitude FROM ref_railway_stations s
+                WHERE s.station_name = bws.transfer_station LIMIT 1) AS transfer_lat,
+               (SELECT s.longitude FROM ref_railway_stations s
+                WHERE s.station_name = bws.transfer_station LIMIT 1) AS transfer_lon
+        FROM bridge_with_station bws
         WHERE transfer_station IS NOT NULL
         GROUP BY transfer_station, line_id, line_name, length_km
         ORDER BY length_km DESC
@@ -728,7 +732,14 @@ def find_transfer_options(
 
     seen_stations: set[str] = set()
     deduped: list[dict[str, Any]] = []
-    columns = ["line_id", "line_name", "length_km", "transfer_station"]
+    columns = [
+        "line_id",
+        "line_name",
+        "length_km",
+        "transfer_station",
+        "transfer_lat",
+        "transfer_lon",
+    ]
     for row in result:
         d = dict(zip(columns, row, strict=True))
         station = d["transfer_station"]

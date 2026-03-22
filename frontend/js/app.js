@@ -530,19 +530,23 @@ async function selectTransferRoute(depLineId, transferLineId, arrLineId, dep, ar
     _route.arrLineId = arrLineId;
     document.getElementById("btn-analyze-route").disabled = false;
 
-    // Point milieu approximatif (correspondance)
-    const midLat = (dep.latitude + arr.latitude) / 2;
-    const midLon = (dep.longitude + arr.longitude) / 2;
+    // Coordonnees reelles de la gare de correspondance
+    const tLat = transferInfo.transfer_lat;
+    const tLon = transferInfo.transfer_lon;
+
+    if (!tLat || !tLon) {
+        console.error("Transfer station coordinates missing");
+        return;
+    }
 
     try {
-        // Charger les 3 segments clippes
+        // 3 segments : dep→transfer, transfer line, transfer→arr
         const [g1, g2, g3] = await Promise.all([
-            _fetchSegment(depLineId, dep.latitude, dep.longitude, midLat, midLon),
-            _fetchSegment(transferLineId, dep.latitude, dep.longitude, arr.latitude, arr.longitude),
-            _fetchSegment(arrLineId, midLat, midLon, arr.latitude, arr.longitude),
+            _fetchSegment(depLineId, dep.latitude, dep.longitude, tLat, tLon),
+            _fetchSegment(transferLineId, tLat, tLon, arr.latitude, arr.longitude),
+            _fetchSegment(arrLineId, tLat, tLon, arr.latitude, arr.longitude),
         ]);
 
-        // Fusionner les features
         const merged = {
             type: "FeatureCollection",
             features: [
@@ -550,16 +554,10 @@ async function selectTransferRoute(depLineId, transferLineId, arrLineId, dep, ar
                 ...(g2.features || []),
                 ...(g3.features || []),
                 _stationMarker(dep.station_name, dep.latitude, dep.longitude, "departure"),
+                _stationMarker(transferInfo.transfer_station, tLat, tLon, "transfer"),
                 _stationMarker(arr.station_name, arr.latitude, arr.longitude, "arrival"),
             ],
         };
-
-        // Ajouter le marqueur de correspondance si on connait la gare
-        if (transferInfo.transfer_station) {
-            merged.features.push(
-                _stationMarker(transferInfo.transfer_station, midLat, midLon, "transfer")
-            );
-        }
 
         if (typeof drawRouteLine === "function") drawRouteLine(merged);
     } catch (err) {
