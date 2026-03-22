@@ -8,11 +8,12 @@ from fastapi import APIRouter, Depends, Query
 from observatoire.api.deps import get_db
 from observatoire.api.schemas.routes import RouteCoverageRequest
 from observatoire.db.queries import (
-    find_transfer_lines,
+    find_transfer_options,
     get_railway_lines,
     get_railway_stations,
     get_route_coverage,
     get_route_geojson,
+    get_route_segment_geojson,
 )
 
 router = APIRouter()
@@ -45,29 +46,37 @@ async def route_coverage(
     body: RouteCoverageRequest,
     db: DB,
 ) -> list[dict[str, Any]]:
-    """Analyse la couverture reseau le long d'une ligne ferroviaire.
-
-    Calcule le pourcentage de couverture par operateur en creant un
-    buffer autour du trace et en l'intersectant avec les polygones
-    de couverture ARCEP.
-    """
+    """Analyse la couverture reseau le long d'une ligne ferroviaire."""
     return get_route_coverage(db, body.line_id, body.technology, body.buffer_km)
 
 
 @router.get("/transfers")
-async def transfer_lines(
+async def transfer_options(
     db: DB,
     dep_lines: str = Query(..., description="Codes lignes depart (virgule)"),
     arr_lines: str = Query(..., description="Codes lignes arrivee (virgule)"),
+    dep_lat: float = Query(..., description="Latitude gare depart"),
+    dep_lon: float = Query(..., description="Longitude gare depart"),
+    arr_lat: float = Query(..., description="Latitude gare arrivee"),
+    arr_lon: float = Query(..., description="Longitude gare arrivee"),
 ) -> list[dict[str, Any]]:
-    """Trouve les lignes de correspondance entre depart et arrivee.
-
-    Utilise la proximite geometrique des traces pour trouver les lignes
-    qui connectent les reseaux depart et arrivee.
-    """
+    """Trouve les correspondances entre depart et arrivee."""
     dep = [c.strip() for c in dep_lines.split(",") if c.strip()]
     arr = [c.strip() for c in arr_lines.split(",") if c.strip()]
-    return find_transfer_lines(db, dep, arr)
+    return find_transfer_options(db, dep, arr, dep_lat, dep_lon, arr_lat, arr_lon)
+
+
+@router.get("/segment")
+async def route_segment(
+    db: DB,
+    line_id: str = Query(..., description="Code ligne"),
+    from_lat: float = Query(..., description="Latitude point depart"),
+    from_lon: float = Query(..., description="Longitude point depart"),
+    to_lat: float = Query(..., description="Latitude point arrivee"),
+    to_lon: float = Query(..., description="Longitude point arrivee"),
+) -> dict[str, Any]:
+    """Retourne le GeoJSON d'un segment de ligne entre deux points."""
+    return get_route_segment_geojson(db, line_id, from_lat, from_lon, to_lat, to_lon)
 
 
 @router.get("/lines/{line_id}/geojson")
@@ -75,5 +84,5 @@ async def line_geojson(
     line_id: str,
     db: DB,
 ) -> dict[str, Any]:
-    """Retourne le GeoJSON d'une ligne ferroviaire (pour affichage carte)."""
+    """Retourne le GeoJSON complet d'une ligne ferroviaire."""
     return get_route_geojson(db, line_id)

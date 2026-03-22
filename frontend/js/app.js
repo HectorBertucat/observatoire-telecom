@@ -389,25 +389,49 @@ async function findAndShowRoute() {
     }
 }
 
+function _stationMarker(name, lat, lon, role) {
+    return {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [lon, lat] },
+        properties: { name, role },
+    };
+}
+
+async function _fetchSegment(lineId, fromLat, fromLon, toLat, toLon) {
+    const params = new URLSearchParams({
+        line_id: lineId,
+        from_lat: fromLat.toString(),
+        from_lon: fromLon.toString(),
+        to_lat: toLat.toString(),
+        to_lon: toLon.toString(),
+    });
+    const res = await fetch(`${API_BASE}/routes/segment?${params}`);
+    return res.json();
+}
+
 async function showDirectRoute(lineId, dep, arr) {
     _route.selectedLineId = lineId;
     _route.transferLineId = null;
+    _route.arrLineId = null;
     document.getElementById("btn-analyze-route").disabled = false;
 
     try {
-        const [geojsonRes, linesRes] = await Promise.all([
-            fetch(`${API_BASE}/routes/lines/${lineId}/geojson`),
-            fetch(`${API_BASE}/routes/lines?search=${lineId}&limit=1`),
-        ]);
-        const geojson = await geojsonRes.json();
-        const lines = await linesRes.json();
+        const geojson = await _fetchSegment(
+            lineId, dep.latitude, dep.longitude, arr.latitude, arr.longitude
+        );
+
+        // Ajouter les marqueurs de gare
+        geojson.features.push(
+            _stationMarker(dep.station_name, dep.latitude, dep.longitude, "departure"),
+            _stationMarker(arr.station_name, arr.latitude, arr.longitude, "arrival"),
+        );
 
         if (typeof drawRouteLine === "function") drawRouteLine(geojson);
 
         const infoDiv = document.getElementById("selected-line-info");
         while (infoDiv.firstChild) infoDiv.removeChild(infoDiv.firstChild);
 
-        const lineInfo = lines[0] || {};
+        const segKm = geojson.features[0]?.properties?.length_km || "?";
         const lineName = document.createElement("div");
         lineName.className = "line-name";
         lineName.textContent = `${dep.station_name} → ${arr.station_name}`;
@@ -415,9 +439,8 @@ async function showDirectRoute(lineId, dep, arr) {
 
         const lineDetail = document.createElement("div");
         lineDetail.className = "line-detail";
-        lineDetail.textContent = `Trajet direct — ${lineInfo.length_km || "?"} km (ligne ${lineId})`;
+        lineDetail.textContent = `Trajet direct — ${segKm} km`;
         infoDiv.appendChild(lineDetail);
-
         infoDiv.style.display = "block";
     } catch (err) {
         console.error("Direct route error:", err);
@@ -438,6 +461,10 @@ async function findTransfers(depLines, arrLines, dep, arr) {
         const params = new URLSearchParams({
             dep_lines: depLines.join(","),
             arr_lines: arrLines.join(","),
+            dep_lat: dep.latitude.toString(),
+            dep_lon: dep.longitude.toString(),
+            arr_lat: arr.latitude.toString(),
+            arr_lon: arr.longitude.toString(),
         });
         const res = await fetch(`${API_BASE}/routes/transfers?${params}`);
         const transfers = await res.json();
@@ -447,7 +474,7 @@ async function findTransfers(depLines, arrLines, dep, arr) {
         if (transfers.length === 0) {
             const noRoute = document.createElement("div");
             noRoute.className = "line-detail";
-            noRoute.textContent = "Aucune correspondance trouvee entre ces gares.";
+            noRoute.textContent = "Aucune correspondance trouvee.";
             infoDiv.appendChild(noRoute);
             return;
         }
@@ -459,7 +486,7 @@ async function findTransfers(depLines, arrLines, dep, arr) {
 
         const hint = document.createElement("div");
         hint.className = "line-detail";
-        hint.textContent = "Pas de trajet direct — choisir une correspondance :";
+        hint.textContent = "Correspondances disponibles :";
         infoDiv.appendChild(hint);
 
         const list = document.createElement("div");
@@ -470,7 +497,10 @@ async function findTransfers(depLines, arrLines, dep, arr) {
             option.className = "transfer-option";
 
             const label = document.createElement("span");
-            label.textContent = t.line_name || `Ligne ${t.line_id}`;
+            const stationLabel = t.transfer_station
+                ? `via ${t.transfer_station}`
+                : (t.line_name || `Ligne ${t.line_id}`);
+            label.textContent = stationLabel;
 
             const km = document.createElement("span");
             km.className = "transfer-km";
@@ -478,16 +508,13 @@ async function findTransfers(depLines, arrLines, dep, arr) {
 
             option.appendChild(label);
             option.appendChild(km);
-
             option.addEventListener("click", () => {
-                // Deselectionner les autres
                 list.querySelectorAll(".transfer-option").forEach((o) =>
                     o.classList.remove("selected")
                 );
                 option.classList.add("selected");
                 selectTransferRoute(depLines[0], t.line_id, arrLines[0], dep, arr, t);
             });
-
             list.appendChild(option);
         });
 
@@ -503,19 +530,36 @@ async function selectTransferRoute(depLineId, transferLineId, arrLineId, dep, ar
     _route.arrLineId = arrLineId;
     document.getElementById("btn-analyze-route").disabled = false;
 
-    // Charger et afficher les 3 lignes (depart, correspondance, arrivee)
+    // Point milieu approximatif (correspondance)
+    const midLat = (dep.latitude + arr.latitude) / 2;
+    const midLon = (dep.longitude + arr.longitude) / 2;
+
     try {
+        // Charger les 3 segments clippes
         const [g1, g2, g3] = await Promise.all([
-            fetch(`${API_BASE}/routes/lines/${depLineId}/geojson`).then((r) => r.json()),
-            fetch(`${API_BASE}/routes/lines/${transferLineId}/geojson`).then((r) => r.json()),
-            fetch(`${API_BASE}/routes/lines/${arrLineId}/geojson`).then((r) => r.json()),
+            _fetchSegment(depLineId, dep.latitude, dep.longitude, midLat, midLon),
+            _fetchSegment(transferLineId, dep.latitude, dep.longitude, arr.latitude, arr.longitude),
+            _fetchSegment(arrLineId, midLat, midLon, arr.latitude, arr.longitude),
         ]);
 
         // Fusionner les features
         const merged = {
             type: "FeatureCollection",
-            features: [...g1.features, ...g2.features, ...g3.features],
+            features: [
+                ...(g1.features || []),
+                ...(g2.features || []),
+                ...(g3.features || []),
+                _stationMarker(dep.station_name, dep.latitude, dep.longitude, "departure"),
+                _stationMarker(arr.station_name, arr.latitude, arr.longitude, "arrival"),
+            ],
         };
+
+        // Ajouter le marqueur de correspondance si on connait la gare
+        if (transferInfo.transfer_station) {
+            merged.features.push(
+                _stationMarker(transferInfo.transfer_station, midLat, midLon, "transfer")
+            );
+        }
 
         if (typeof drawRouteLine === "function") drawRouteLine(merged);
     } catch (err) {

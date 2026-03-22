@@ -275,52 +275,129 @@ function filterTechnologyOnMap(tech) {
 }
 
 /* === ROUTE LINE DISPLAY === */
-function drawRouteLine(geojson) {
-    // Supprimer la couche precedente si elle existe
-    if (map.getLayer("route-line")) map.removeLayer("route-line");
-    if (map.getLayer("route-line-border")) map.removeLayer("route-line-border");
-    if (map.getSource("route")) map.removeSource("route");
+const _routeLayers = [
+    "route-line-border", "route-line", "route-line-dash",
+    "route-stations-circle", "route-stations-border", "route-stations-label",
+];
 
+function drawRouteLine(geojson) {
+    clearRouteLine();
     if (!geojson || !geojson.features || geojson.features.length === 0) return;
 
     map.addSource("route", { type: "geojson", data: geojson });
 
-    // Bordure (plus large, sombre)
+    // Fond sombre large
     map.addLayer({
         id: "route-line-border",
         type: "line",
         source: "route",
+        filter: ["==", ["geometry-type"], "LineString"],
         paint: {
-            "line-color": "#0f172a",
-            "line-width": 6,
-            "line-opacity": 0.8,
+            "line-color": "#1e293b",
+            "line-width": 7,
+            "line-opacity": 0.9,
+            "line-cap": "round",
+            "line-join": "round",
         },
     }, "labels");
 
-    // Ligne principale (jaune/or)
+    // Ligne blanche semi-transparente
     map.addLayer({
         id: "route-line",
         type: "line",
         source: "route",
+        filter: ["==", ["geometry-type"], "LineString"],
         paint: {
-            "line-color": "#facc15",
+            "line-color": "#e2e8f0",
             "line-width": 3,
             "line-opacity": 0.9,
+            "line-cap": "round",
+            "line-join": "round",
         },
     }, "labels");
 
-    // Zoom sur la ligne
+    // Tirets colores par-dessus (style ferroviaire)
+    map.addLayer({
+        id: "route-line-dash",
+        type: "line",
+        source: "route",
+        filter: ["==", ["geometry-type"], "LineString"],
+        paint: {
+            "line-color": "#3b82f6",
+            "line-width": 3,
+            "line-dasharray": [2, 3],
+            "line-opacity": 0.8,
+            "line-cap": "butt",
+        },
+    }, "labels");
+
+    // Cercle de fond des marqueurs de gare (bordure)
+    map.addLayer({
+        id: "route-stations-border",
+        type: "circle",
+        source: "route",
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+            "circle-radius": 8,
+            "circle-color": "#1e293b",
+            "circle-stroke-color": "#e2e8f0",
+            "circle-stroke-width": 2,
+        },
+    }, "labels");
+
+    // Cercle interieur colore
+    map.addLayer({
+        id: "route-stations-circle",
+        type: "circle",
+        source: "route",
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+            "circle-radius": 5,
+            "circle-color": [
+                "match", ["get", "role"],
+                "departure", "#10b981",
+                "arrival", "#ef4444",
+                "transfer", "#f59e0b",
+                "#3b82f6",
+            ],
+        },
+    }, "labels");
+
+    // Labels des gares
+    map.addLayer({
+        id: "route-stations-label",
+        type: "symbol",
+        source: "route",
+        filter: ["==", ["geometry-type"], "Point"],
+        layout: {
+            "text-field": ["get", "name"],
+            "text-size": 12,
+            "text-font": ["Open Sans Regular"],
+            "text-offset": [0, 1.5],
+            "text-anchor": "top",
+            "text-allow-overlap": true,
+        },
+        paint: {
+            "text-color": "#e2e8f0",
+            "text-halo-color": "#0f1729",
+            "text-halo-width": 2,
+        },
+    }, "labels");
+
+    // Zoom sur l'ensemble
     const coords = [];
     geojson.features.forEach((f) => {
         const geom = f.geometry;
-        if (geom.type === "LineString") {
+        if (geom.type === "Point") {
+            coords.push(geom.coordinates);
+        } else if (geom.type === "LineString") {
             coords.push(...geom.coordinates);
         } else if (geom.type === "MultiLineString") {
             geom.coordinates.forEach((line) => coords.push(...line));
         }
     });
 
-    if (coords.length > 0) {
+    if (coords.length > 1) {
         const lngs = coords.map((c) => c[0]);
         const lats = coords.map((c) => c[1]);
         map.fitBounds(
@@ -331,8 +408,7 @@ function drawRouteLine(geojson) {
 }
 
 function clearRouteLine() {
-    if (map.getLayer("route-line")) map.removeLayer("route-line");
-    if (map.getLayer("route-line-border")) map.removeLayer("route-line-border");
+    _routeLayers.forEach((id) => { if (map.getLayer(id)) map.removeLayer(id); });
     if (map.getSource("route")) map.removeSource("route");
 }
 

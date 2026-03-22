@@ -633,54 +633,161 @@ def get_route_geojson(
     return {"type": "FeatureCollection", "features": [feature]}
 
 
-def find_transfer_lines(
+def find_transfer_options(
     conn: duckdb.DuckDBPyConnection,
     dep_line_ids: list[str],
     arr_line_ids: list[str],
-    proximity_m: float = 500,
+    dep_lat: float,
+    dep_lon: float,
+    arr_lat: float,
+    arr_lon: float,
 ) -> list[dict[str, Any]]:
-    """Trouve les lignes de correspondance entre deux groupes de lignes.
+    """Trouve les correspondances entre deux groupes de lignes.
 
-    Utilise la proximite geometrique (ST_DWithin) pour determiner quelles
-    lignes intersectent a la fois une ligne depart et une ligne arrivee.
+    Utilise la proximite geometrique (ST_DWithin 500m) pour trouver
+    une ligne-pont, puis identifie les gares de correspondance les
+    plus proches du point de jonction.
     """
     if not dep_line_ids or not arr_line_ids:
         return []
 
-    dep_placeholders = ", ".join(["?"] * len(dep_line_ids))
-    arr_placeholders = ", ".join(["?"] * len(arr_line_ids))
+    dep_ph = ", ".join(["?"] * len(dep_line_ids))
+    arr_ph = ", ".join(["?"] * len(arr_line_ids))
 
     result = conn.execute(
         f"""
-        WITH dep_neighbors AS (
-            SELECT DISTINCT l2.line_id, l2.line_name, l2.length_km
-            FROM ref_railway_lines l1
-            JOIN ref_railway_lines l2
-                ON l1.line_id != l2.line_id
-                AND ST_DWithin(l1.geometry, l2.geometry, ?)
-            WHERE l1.line_id IN ({dep_placeholders})
-        ),
-        arr_neighbors AS (
-            SELECT DISTINCT l2.line_id
-            FROM ref_railway_lines l1
-            JOIN ref_railway_lines l2
-                ON l1.line_id != l2.line_id
-                AND ST_DWithin(l1.geometry, l2.geometry, ?)
-            WHERE l1.line_id IN ({arr_placeholders})
+        WITH bridge AS (
+            SELECT DISTINCT l_bridge.line_id, l_bridge.line_name,
+                   l_bridge.length_km, l_bridge.geometry
+            FROM ref_railway_lines l_dep
+            JOIN ref_railway_lines l_bridge
+                ON l_dep.line_id != l_bridge.line_id
+                AND ST_DWithin(l_dep.geometry, l_bridge.geometry, 500)
+            JOIN ref_railway_lines l_arr
+                ON l_bridge.line_id != l_arr.line_id
+                AND ST_DWithin(l_bridge.geometry, l_arr.geometry, 500)
+            WHERE l_dep.line_id IN ({dep_ph})
+              AND l_arr.line_id IN ({arr_ph})
+              AND l_bridge.line_id NOT IN ({dep_ph})
+              AND l_bridge.line_id NOT IN ({arr_ph})
         )
-        SELECT d.line_id, d.line_name, ROUND(d.length_km, 1) AS length_km
-        FROM dep_neighbors d
-        JOIN arr_neighbors a ON d.line_id = a.line_id
-        WHERE d.line_id NOT IN ({dep_placeholders})
-          AND d.line_id NOT IN ({arr_placeholders})
-        ORDER BY d.length_km DESC
+        SELECT
+            b.line_id,
+            b.line_name,
+            ROUND(b.length_km, 1) AS length_km,
+            -- Gare la plus proche du point de jonction dep/bridge
+            (SELECT s.station_name
+             FROM ref_railway_stations s
+             WHERE s.line_code IN ({dep_ph})
+                OR s.line_code = b.line_id
+             ORDER BY (s.latitude - ?) * (s.latitude - ?)
+                    + (s.longitude - ?) * (s.longitude - ?)
+                      * COS(RADIANS(?)) * COS(RADIANS(?))
+             LIMIT 1) AS transfer_station
+        FROM bridge b
+        ORDER BY b.length_km DESC
         LIMIT 5
         """,
-        [proximity_m, *dep_line_ids, proximity_m, *arr_line_ids, *dep_line_ids, *arr_line_ids],
+        [
+            *dep_line_ids,
+            *arr_line_ids,
+            *dep_line_ids,
+            *arr_line_ids,
+            *dep_line_ids,
+            # Pour la sous-requete: point milieu dep/arr comme approximation
+            (dep_lat + arr_lat) / 2,
+            (dep_lat + arr_lat) / 2,
+            (dep_lon + arr_lon) / 2,
+            (dep_lon + arr_lon) / 2,
+            (dep_lat + arr_lat) / 2,
+            (dep_lat + arr_lat) / 2,
+        ],
     ).fetchall()
 
-    columns = ["line_id", "line_name", "length_km"]
+    columns = ["line_id", "line_name", "length_km", "transfer_station"]
     return [dict(zip(columns, row, strict=True)) for row in result]
+
+
+def get_route_segment_geojson(
+    conn: duckdb.DuckDBPyConnection,
+    line_id: str,
+    from_lat: float,
+    from_lon: float,
+    to_lat: float,
+    to_lon: float,
+) -> dict[str, Any]:
+    """Retourne le GeoJSON d'un segment de ligne entre deux points.
+
+    Utilise ST_LineLocatePoint pour trouver les fractions sur la ligne,
+    puis extrait les coordonnees entre ces deux points.
+    """
+    result = conn.execute(
+        """
+        SELECT
+            ST_AsGeoJSON(
+                ST_FlipCoordinates(
+                    ST_Transform(geometry, 'EPSG:2154', 'EPSG:4326')
+                )
+            ) AS geojson,
+            ST_LineLocatePoint(
+                geometry,
+                ST_Transform(
+                    ST_FlipCoordinates(ST_Point(?, ?)),
+                    'EPSG:4326', 'EPSG:2154'
+                )
+            ) AS frac_from,
+            ST_LineLocatePoint(
+                geometry,
+                ST_Transform(
+                    ST_FlipCoordinates(ST_Point(?, ?)),
+                    'EPSG:4326', 'EPSG:2154'
+                )
+            ) AS frac_to,
+            line_id,
+            line_name,
+            ROUND(length_km, 1) AS length_km
+        FROM ref_railway_lines
+        WHERE line_id = ?
+        LIMIT 1
+        """,
+        [from_lon, from_lat, to_lon, to_lat, line_id],
+    ).fetchone()
+
+    if not result:
+        return {"type": "FeatureCollection", "features": []}
+
+    full_geom = json.loads(result[0])
+    frac_from = min(result[1], result[2])
+    frac_to = max(result[1], result[2])
+
+    # Extraire le sous-segment des coordonnees
+    coords = full_geom.get("coordinates", [])
+    if full_geom.get("type") == "MultiLineString":
+        # Aplatir en une seule liste de coords
+        coords = [c for part in coords for c in part]
+
+    if len(coords) > 1:
+        start_idx = max(0, int(frac_from * (len(coords) - 1)))
+        end_idx = min(len(coords) - 1, int(frac_to * (len(coords) - 1)) + 1)
+        if end_idx <= start_idx:
+            end_idx = start_idx + 1
+        segment_coords = coords[start_idx:end_idx]
+    else:
+        segment_coords = coords
+
+    segment_km = round(result[5] * (frac_to - frac_from), 1)
+
+    feature: dict[str, Any] = {
+        "type": "Feature",
+        "geometry": {"type": "LineString", "coordinates": segment_coords},
+        "properties": {
+            "line_id": result[3],
+            "line_name": result[4],
+            "length_km": segment_km,
+            "type": "route",
+        },
+    }
+    return {"type": "FeatureCollection", "features": [feature]}
 
 
 def populate_simplified_coverage(conn: duckdb.DuckDBPyConnection) -> int:
